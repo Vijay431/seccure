@@ -1,0 +1,9 @@
+# These owners will be the default reviewers for pull requests.
+# Order is important; the last matching pattern takes the most precedence.
+
+# Global default: Any PR needs review from the core maintainers team.
+# (Replace with actual GitHub handles or teams)
+*       @owner
+
+# Agent logic requires strict review
+/agent/ @owner

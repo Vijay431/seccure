@@ -1,0 +1,58 @@
+name: 🛡️ Seccure — Auto Security Fix
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'       # Every Monday 02:00 UTC
+  workflow_dispatch:            # Manual on-demand trigger
+    inputs:
+      target_repo:
+        description: 'Target repo (owner/repo). Leave blank to use current repo.'
+        required: false
+        default: ''
+      additional_constraints:
+        description: |
+          One-off extra constraints for this run only (plain text).
+          Example: "Do not upgrade react beyond 18.x"
+          These are merged with .seccure/constraints.md if it exists.
+        required: false
+        default: ''
+
+permissions:
+  contents: write              # clone repo, push fix branch
+  pull-requests: write         # create / close PRs
+  issues: write                # read + create conflict issues
+  security-events: read        # read Dependabot alerts & code scanning
+
+jobs:
+  seccure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30        # prevent runaway jobs
+    container:
+      # Replace 'owner' with the actual repository owner where the image is hosted
+      image: ghcr.io/owner/seccure:latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GITHUB_TOKEN: ${{ github.token }}
+      GITHUB_RUN_ID: ${{ github.run_id }}
+      TARGET_REPO: ${{ inputs.target_repo || github.repository }}
+      ADDITIONAL_CONSTRAINTS: ${{ inputs.additional_constraints || '' }}
+    steps:
+      - name: Checkout target repo (to read .seccure/constraints.md)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.target_repo || github.repository }}
+          path: target_repo
+          sparse-checkout: .seccure
+          sparse-checkout-cone-mode: false
+
+      - name: Run Seccure Agent
+        run: python /app/agent/main.py
+        env:
+          SECCURE_CONSTRAINTS_DIR: ${{ github.workspace }}/target_repo/.seccure
+
+      - name: Upload state artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seccure-state-${{ github.run_id }}
+          path: /tmp/seccure_state_*.json

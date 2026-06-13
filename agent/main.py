@@ -22,9 +22,13 @@ import os
 from datetime import date
 from pathlib import Path
 
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Ensure the root directory is in sys.path so 'agent' module can be found
+sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
 
 from agent.config import SeccureState
 from agent.coordinator.agent import build_coordinator

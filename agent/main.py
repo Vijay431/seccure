@@ -22,6 +22,10 @@ import os
 from datetime import date
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from agent.config import SeccureState
 from agent.coordinator.agent import build_coordinator
 from agent.state import init_state

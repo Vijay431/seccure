@@ -1,0 +1,49 @@
+[project]
+name = "seccure"
+version = "1.0.0"
+description = "Seccure is an automated multi-agent GitHub Dependabot auto-fix AI agent. It uses Google ADK to autonomously fix security vulnerabilities, resolve npm audit alerts, and generate consolidated pull requests."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "Seccure Contributors" },
+]
+keywords = [
+    "security",
+    "dependabot",
+    "auto-fix",
+    "ai",
+    "agent",
+    "adk",
+    "vulnerability",
+    "npm",
+    "cve"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C4",  # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true

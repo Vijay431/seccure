@@ -1,0 +1,27 @@
+# Environments
+venv/
+.env
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local workspace directories
+/tmp/seccure_workspace/
+/tmp/seccure_state_*.json
+/tmp/seccure_conversations/
+/tmp/seccure_app_data/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

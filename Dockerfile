@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 LABEL org.opencontainers.image.title="Seccure"
 LABEL org.opencontainers.image.description="Automated npm security vulnerability fixer using Google ADK"

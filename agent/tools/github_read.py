@@ -13,7 +13,7 @@ from typing import Any
 
 from google.antigravity import ToolContext
 
-from agent.tools.github_client import get
+from agent.tools.github_client import get, get_text
 
 
 def _repo() -> str:
@@ -131,7 +131,7 @@ def list_dependabot_prs(ctx: ToolContext) -> str:
 def _parse_dependabot_title(title: str) -> tuple[str, str, str]:
     """Extract package, from_version, to_version from a Dependabot PR title."""
     match = re.search(
-        r"bump\s+(?P<pkg>[\w@/.-]+)\s+from\s+(?P<from>[\d.]+)\s+to\s+(?P<to>[\d.]+)",
+        r"(?:bump|update)\s+(?P<pkg>[\w@/.-]+)(?:\s+requirement)?\s+from\s+(?P<from>[<>=^\~]*[\d.\w-]+)\s+to\s+(?P<to>[<>=^\~]*[\d.\w-]+)",
         title,
         re.IGNORECASE,
     )
@@ -163,13 +163,17 @@ def list_dependabot_alerts(ctx: ToolContext) -> str:
     page = 1
 
     while True:
-        batch = get(
-            f"/repos/{repo}/dependabot/alerts",
-            state="open",
-            ecosystem="npm",
-            per_page=100,
-            page=page,
-        )
+        try:
+            batch = get(
+                f"/repos/{repo}/dependabot/alerts",
+                state="open",
+                per_page=100,
+                page=page,
+            )
+        except Exception:
+            # If dependabot alerts are disabled or return 403, just return an empty list
+            batch = []
+
         if not isinstance(batch, list) or not batch:
             break
         for alert in batch:
@@ -237,3 +241,51 @@ def list_code_scanning_alerts(ctx: ToolContext) -> str:
     payload = json.dumps(results)
     ctx.set_state("raw_code_scanning_alerts", payload)
     return payload
+
+
+def fetch_ci_logs_for_pr(pr_number: int) -> str:
+    """Fetch GitHub Action CI logs for the failed checks on a PR.
+    
+    Args:
+        pr_number: The pull request number.
+        
+    Returns:
+        A concatenated string of the tail of the logs from all failed jobs.
+    """
+    repo = _repo()
+    try:
+        pr = get(f"/repos/{repo}/pulls/{pr_number}")
+    except Exception as e:
+        return f"Error fetching PR: {e}"
+        
+    head_sha = pr.get("head", {}).get("sha")
+    if not head_sha:
+        return "PR head sha not found."
+
+    try:
+        checks = get(f"/repos/{repo}/commits/{head_sha}/check-runs")
+    except Exception as e:
+        return f"Error fetching check runs: {e}"
+        
+    if not isinstance(checks, dict):
+        return "Invalid check runs response."
+        
+    runs = checks.get("check_runs", [])
+    failed_runs = [r for r in runs if r.get("conclusion") in ("failure", "timed_out")]
+    
+    if not failed_runs:
+        return "No failed check runs found. Pipeline might be green or still running."
+        
+    logs_summary = []
+    for run in failed_runs:
+        job_id = run.get("id")
+        name = run.get("name", "Unknown Job")
+        logs_summary.append(f"--- Logs for failed job: {name} (ID: {job_id}) ---")
+        try:
+            log_text = get_text(f"/repos/{repo}/actions/jobs/{job_id}/logs")
+            # The log might be huge. Grab the last 5000 characters
+            logs_summary.append(log_text[-5000:])
+        except Exception as e:
+            logs_summary.append(f"Could not fetch logs: {e}")
+            
+    return "\n\n".join(logs_summary)

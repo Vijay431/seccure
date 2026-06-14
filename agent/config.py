@@ -91,3 +91,28 @@ class AlertSummary(BaseModel):
     count: int
     critical_count: int
     high_count: int
+
+
+# ---------------------------------------------------------------------------
+# Execution guard-rails
+# ---------------------------------------------------------------------------
+
+
+class RunLimits:
+    """Hard limits that prevent agents from running indefinitely.
+
+    All values can be overridden with environment variables so that
+    operators can tune them in CI without code changes.
+    """
+
+    import os as _os
+
+    # Maximum number of tool calls a single agent turn is allowed to make.
+    # Coordinator has more tools and a more complex task, so its ceiling is
+    # intentionally higher than for the narrow data-gathering subagents.
+    COORDINATOR_MAX_TOOL_CALLS: int = int(_os.environ.get("SECCURE_COORDINATOR_MAX_TOOLS", "60"))
+    SUBAGENT_MAX_TOOL_CALLS: int = int(_os.environ.get("SECCURE_SUBAGENT_MAX_TOOLS", "10"))
+
+    # Wall-clock timeout (seconds) for the *entire* coordinator run, including
+    # the time spent in subagents.  Default = 30 minutes.
+    TOTAL_RUN_TIMEOUT_SECONDS: int = int(_os.environ.get("SECCURE_TIMEOUT_SECONDS", "1800"))

@@ -21,6 +21,7 @@ def _client() -> httpx.Client:
         headers={**_HEADERS, "Authorization": f"Bearer {token}"},
         transport=transport,
         timeout=30,
+        follow_redirects=True,
     )
 
 
@@ -46,3 +47,10 @@ def patch(path: str, body: dict) -> dict:
         resp = client.patch(path, json=body)
         resp.raise_for_status()
         return resp.json()
+
+def get_text(path: str, **params: str | int) -> str:
+    """Perform a GET request and return the raw text body."""
+    with _client() as client:
+        resp = client.get(path, params=params)
+        resp.raise_for_status()
+        return resp.text

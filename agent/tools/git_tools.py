@@ -117,81 +117,103 @@ def ensure_lockfile() -> str:
     return "Generated package-lock.json via 'npm install --package-lock-only'."
 
 
-def run_npm_audit_fix() -> str:
-    """Run 'npm audit fix' to automatically patch known vulnerabilities.
+def run_auto_fix(ecosystem: str = "npm") -> str:
+    """Run automatic vulnerability patcher if available for the ecosystem.
 
     Returns:
         JSON string with exit_code, truncated stdout/stderr.
     """
-    code, out, err = _run(["npm", "audit", "fix", "--ignore-scripts"])
-    return json.dumps(
-        {
-            "exit_code": code,
-            "stdout": out[:3000],
-            "stderr": err[:1000],
-            "note": "Non-zero exit does not always mean failure — some vulnerabilities may remain.",
-        }
-    )
+    ecosystem = ecosystem.lower()
+    if ecosystem == "npm":
+        code, out, err = _run(["npm", "audit", "fix", "--ignore-scripts"])
+        return json.dumps(
+            {
+                "exit_code": code,
+                "stdout": out[:3000],
+                "stderr": err[:1000],
+                "note": "Non-zero exit does not always mean failure — some vulnerabilities may remain.",
+            }
+        )
+    return json.dumps({"error": f"Auto-fix not implemented for ecosystem: {ecosystem}"})
 
 
-def apply_npm_overrides(package: str, safe_version: str) -> str:
-    """Add or update an entry in the 'overrides' block of package.json.
-
-    This forces a specific version of a transitive (indirect) dependency,
-    which is the correct approach for nested dep vulnerabilities.
+def apply_package_override(package: str, safe_version: str, ecosystem: str = "npm") -> str:
+    """Add or update an entry to override nested dependencies.
 
     Args:
-        package: The npm package name (e.g. 'nth-check').
-        safe_version: The safe version specifier (e.g. '>= 2.1.1').
+        package: The package name.
+        safe_version: The safe version specifier.
+        ecosystem: The target ecosystem ("npm" etc).
 
     Returns:
         Confirmation or error.
     """
-    pkg_path = _WORKSPACE / "package.json"
-    if not pkg_path.exists():
-        return "Error: package.json not found."
+    ecosystem = ecosystem.lower()
+    if ecosystem == "npm":
+        pkg_path = _WORKSPACE / "package.json"
+        if not pkg_path.exists():
+            return "Error: package.json not found."
 
-    pkg = json.loads(pkg_path.read_text())
-    if "overrides" not in pkg:
-        pkg["overrides"] = {}
-    pkg["overrides"][package] = safe_version
-    pkg_path.write_text(json.dumps(pkg, indent=2))
+        pkg = json.loads(pkg_path.read_text())
+        if "overrides" not in pkg:
+            pkg["overrides"] = {}
+        pkg["overrides"][package] = safe_version
+        pkg_path.write_text(json.dumps(pkg, indent=2))
 
-    code, out, err = _run(["npm", "install", "--ignore-scripts"])
-    if code != 0:
-        return f"Override written but npm install failed: {err[:500]}"
-    return f"Added override: {package} -> {safe_version} and ran npm install."
+        code, out, err = _run(["npm", "install", "--ignore-scripts"])
+        if code != 0:
+            return f"Override written but npm install failed: {err[:500]}"
+        return f"Added override: {package} -> {safe_version} and ran npm install."
+    
+    return f"apply_package_override is not yet supported for ecosystem: {ecosystem}"
 
 
-def bump_package_version(package: str, target_version: str) -> str:
-    """Directly update a top-level dependency in package.json and reinstall.
+def bump_package_version(package: str, target_version: str, ecosystem: str = "npm") -> str:
+    """Directly update a dependency's version and reinstall.
 
     Args:
-        package: The npm package name.
-        target_version: The target version string (e.g. '4.17.21').
+        package: The package name.
+        target_version: The target version string.
+        ecosystem: The target ecosystem ("npm", "python", etc).
 
     Returns:
         Confirmation or error.
     """
-    pkg_path = _WORKSPACE / "package.json"
-    if not pkg_path.exists():
-        return "Error: package.json not found."
+    ecosystem = ecosystem.lower()
+    
+    if ecosystem == "npm":
+        pkg_path = _WORKSPACE / "package.json"
+        if not pkg_path.exists():
+            return "Error: package.json not found."
 
-    pkg = json.loads(pkg_path.read_text())
-    bumped = False
-    for dep_key in ("dependencies", "devDependencies", "peerDependencies"):
-        if package in pkg.get(dep_key, {}):
-            pkg[dep_key][package] = target_version
-            bumped = True
+        pkg = json.loads(pkg_path.read_text())
+        bumped = False
+        for dep_key in ("dependencies", "devDependencies", "peerDependencies"):
+            if package in pkg.get(dep_key, {}):
+                pkg[dep_key][package] = target_version
+                bumped = True
 
-    if not bumped:
-        return f"'{package}' not found in top-level dependencies — try apply_npm_overrides instead."
+        if not bumped:
+            return f"'{package}' not found in top-level dependencies — try apply_package_override instead."
 
-    pkg_path.write_text(json.dumps(pkg, indent=2))
-    code, out, err = _run(["npm", "install", "--ignore-scripts"])
-    if code != 0:
-        return f"Version bumped in package.json but npm install failed: {err[:500]}"
-    return f"Bumped {package} to {target_version} and ran npm install."
+        pkg_path.write_text(json.dumps(pkg, indent=2))
+        code, out, err = _run(["npm", "install", "--ignore-scripts"])
+        if code != 0:
+            return f"Version bumped in package.json but npm install failed: {err[:500]}"
+        return f"Bumped {package} to {target_version} and ran npm install."
+
+    elif ecosystem in ("python", "pip", "uv"):
+        import re
+        if not re.match(r"^[<>=^\~]", target_version):
+            target_version = f"=={target_version}"
+            
+        code, out, err = _run(["uv", "add", f"{package}{target_version}"])
+        if code != 0:
+            return f"Failed to bump python package {package} using uv: {err}"
+            
+        return f"Bumped Python package {package} to {target_version} using uv add."
+        
+    return f"Unsupported ecosystem: {ecosystem}"
 
 
 def check_remaining_vulnerabilities() -> str:
@@ -236,24 +258,29 @@ def check_remaining_vulnerabilities() -> str:
 
 
 def commit_changes(message: str | None = None) -> str:
-    """Stage package.json + package-lock.json and commit.
+    """Commit any changes in package.json, package-lock.json, pyproject.toml, uv.lock, or requirements.txt.
 
     Args:
         message: Optional commit message. Defaults to standard security fix message.
-
-    Returns:
-        Confirmation or error.
     """
-    commit_msg = message or "fix(deps): automated npm security patches [seccure]"
+    commit_msg = message or "fix(deps): automated security patches [seccure]"
     _run(["git", "config", "user.name", "seccure-bot"])
     _run(["git", "config", "user.email", "seccure-bot@users.noreply.github.com"])
-    _run(["git", "add", "package.json", "package-lock.json"])
-    code, out, err = _run(["git", "commit", "-m", commit_msg])
+
+    files_to_add = ["package.json", "package-lock.json", "pyproject.toml", "uv.lock", "requirements.txt"]
+    existing_files = [f for f in files_to_add if (_WORKSPACE / f).exists()]
+    if existing_files:
+        _run(["git", "add"] + existing_files)
+        
+    code, out, err = _run(["git", "diff", "--staged", "--quiet"])
     if code != 0:
-        if "nothing to commit" in out + err:
-            return "Nothing to commit — no changes were made to package files."
-        return f"Commit failed: {err}"
-    return f"Committed: {commit_msg}"
+        # Changes are staged, now commit
+        code, out, err = _run(["git", "commit", "-m", commit_msg])
+        if code != 0:
+            return f"Commit failed: {err}"
+        return f"Committed: {commit_msg}"
+
+    return "Nothing to commit — no changes were made to tracked files."
 
 
 def push_branch(branch_name: str, repo: str) -> str:

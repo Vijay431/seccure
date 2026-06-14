@@ -30,7 +30,7 @@ load_dotenv()
 # Ensure the root directory is in sys.path so 'agent' module can be found
 sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
 
-from agent.config import SeccureState
+from agent.config import RunLimits, SeccureState
 from agent.coordinator.agent import build_coordinator
 from agent.state import init_state
 from agent.tools.repo_constraints import load_constraints_text
@@ -116,7 +116,7 @@ You are the Seccure Coordinator. Your job is to:
 1. Spawn IssueAgent, PRAgent, and SecurityAgent in parallel to gather security data.
 2. Read the shared state summary.
 3. If there is nothing to fix, exit cleanly with status 'nothing_to_fix'.
-4. Otherwise, clone the target repo, apply npm vulnerability fixes, and open a consolidated PR.
+4. Otherwise, clone the target repo, apply npm and Python vulnerability fixes, and open a consolidated PR.
 
 Target repository: {repo}
 Run ID: {run_id}
@@ -126,8 +126,34 @@ Begin now. Follow your system instructions exactly.
 """
 
     # 4. Run the Coordinator
+    # Local runs get a hard wall-clock timeout to catch stalled sessions.
+    # Inside GitHub Actions the workflow's own `timeout-minutes:` handles this,
+    # so we skip the asyncio guard to avoid conflicting with it.
+    _in_ci = os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
+    timeout = RunLimits.TOTAL_RUN_TIMEOUT_SECONDS
+    if _in_ci:
+        print("[Seccure] Running in GitHub Actions — local timeout disabled (use workflow timeout-minutes instead).")
+    else:
+        print(f"[Seccure] Local run — timeout set to {timeout}s ({timeout // 60} min).")
+
     async with coordinator as agent:
-        response = await agent.chat(task_prompt)
+        if _in_ci:
+            # No asyncio timeout; the GHA runner enforces the job deadline.
+            response = await agent.chat(task_prompt)
+        else:
+            try:
+                response = await asyncio.wait_for(
+                    agent.chat(task_prompt),
+                    timeout=timeout,
+                )
+            except asyncio.TimeoutError:
+                print(
+                    f"\n[Seccure] ⏰ TIMEOUT: coordinator did not complete within "
+                    f"{timeout}s ({timeout // 60} min). "
+                    f"Increase SECCURE_TIMEOUT_SECONDS if the repo is large. "
+                    f"Exiting with error."
+                )
+                sys.exit(1)
         final_text = await response.text()
         print(f"\n[Seccure] Coordinator completed:\n{final_text}")
 

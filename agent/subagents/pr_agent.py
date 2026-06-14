@@ -8,27 +8,40 @@ from __future__ import annotations
 
 from google.antigravity import Agent, LocalAgentConfig
 
-from agent.config import PRSummary
+from agent.config import PRSummary, RunLimits
 from agent.state import read_state, write_state_section
 from agent.tools.github_read import list_dependabot_prs
 
 _PROMPT = """You are the PRAgent for the Seccure security automation system.
 
-Your ONLY job:
-1. Call list_dependabot_prs() to fetch all open PRs by dependabot[bot].
-2. For each PR extract: pr_number (from 'number' field), package, from_version, to_version, url (from 'html_url' field).
-   If package/versions are 'unknown', keep them as-is.
-3. Call write_state_section('dependabot_prs', <list of PR dicts>) to persist.
-4. Respond with ONLY valid JSON matching PRSummary: {"items": [...], "count": N}
+You MUST follow these steps exactly:
+1. CALL `list_dependabot_prs()` tool to fetch all open PRs by dependabot[bot].
+2. STOP and wait for the tool output. Do NOT hallucinate data.
+3. Once you receive the tool output, extract the data.
+4. CALL `write_state_section()` tool with section="dependabot_prs" and the extracted data.
+5. Output the EXACT SAME JSON: {"items": [...], "count": N}
+"""
 
-Do NOT call any other tools. Do NOT generate prose."""
 
-
-def build_pr_agent() -> Agent:
+def build_pr_agent() -> Agent | "OpenRouterAgent":
     """Build and return the PRAgent instance."""
+    import os
+    provider = os.environ.get("LLM_PROVIDER", "antigravity").lower()
+    tools = [list_dependabot_prs, read_state, write_state_section]
+    
+    if provider == "openrouter":
+        from agent.openrouter_runner import OpenRouterAgent
+        return OpenRouterAgent(
+            system_instructions=_PROMPT,
+            tools=tools,
+            response_schema=PRSummary,
+            model="openai/gpt-4o-mini",
+            max_tool_calls=RunLimits.SUBAGENT_MAX_TOOL_CALLS,
+        )
+
     config = LocalAgentConfig(
         system_instructions=_PROMPT,
-        tools=[list_dependabot_prs, read_state, write_state_section],
+        tools=tools,
         response_schema=PRSummary,
     )
     return Agent(config)

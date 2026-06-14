@@ -8,7 +8,7 @@ To manage complexity, avoid context-window bloat, and prevent LLM hallucinations
 
 ## 🧠 1. The Coordinator Agent
 **Role:** The mastermind and orchestrator.
-**Model:** `gemini-2.5-pro` (Highly capable at reasoning and complex planning)
+**Model:** `openai/gpt-5-nano` via OpenRouter (Highly capable at reasoning, complex planning, and reliable tool-execution)
 
 The Coordinator is the only agent that takes action. It acts as the bridge between the target repository and the GitHub API. 
 
@@ -24,7 +24,7 @@ The Coordinator is the only agent that takes action. It acts as the bridge betwe
 ## 🕵️‍♂️ 2. The Data-Gathering Subagents
 Because raw GitHub API responses (like Dependabot alerts or Pull Request JSONs) are enormous, feeding them directly to the Coordinator would overwhelm its context window and cost unnecessary tokens.
 
-Instead, the Coordinator spawns three specialized **Subagents** in parallel. These agents use smaller, faster models (`gemini-2.0-flash`), have a narrow focus, and are constrained to output strictly typed JSON (via Pydantic schemas).
+Instead, the Coordinator spawns three specialized **Subagents** in parallel. These agents use `openai/gpt-4o-mini` via OpenRouter for strict and reliable JSON tool-calling execution, have a narrow focus, and are constrained to output strictly typed JSON (via Pydantic schemas).
 
 ### 🐛 IssueAgent
 * **Job:** Calls the GitHub Issues API to find all open issues tagged with `security` or `dependabot`.

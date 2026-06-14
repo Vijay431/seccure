@@ -8,26 +8,40 @@ from __future__ import annotations
 
 from google.antigravity import Agent, LocalAgentConfig
 
-from agent.config import IssueSummary
+from agent.config import IssueSummary, RunLimits
 from agent.state import read_state, write_state_section
 from agent.tools.github_read import list_security_issues
 
 _PROMPT = """You are the IssueAgent for the Seccure security automation system.
 
-Your ONLY job:
-1. Call list_security_issues() to fetch all open issues labelled 'security' or 'dependabot'.
-2. For each issue extract: issue_number (from 'number' field), title, labels (list of name strings), url (from 'html_url' field).
-3. Call write_state_section('security_issues', <list of issue dicts>) to persist.
-4. Respond with ONLY valid JSON matching IssueSummary: {"items": [...], "count": N}
+You MUST follow these steps exactly:
+1. CALL `list_security_issues()` tool to fetch open security issues.
+2. STOP and wait for the tool output. Do NOT hallucinate data.
+3. Once you receive the tool output, extract the data.
+4. CALL `write_state_section()` tool with section="security_issues" and the extracted data.
+5. Output the EXACT SAME JSON: {"items": [...], "count": N}
+"""
 
-Do NOT call any other tools. Do NOT generate prose."""
 
-
-def build_issue_agent() -> Agent:
+def build_issue_agent() -> Agent | "OpenRouterAgent":
     """Build and return the IssueAgent instance."""
+    import os
+    provider = os.environ.get("LLM_PROVIDER", "antigravity").lower()
+    tools = [list_security_issues, read_state, write_state_section]
+    
+    if provider == "openrouter":
+        from agent.openrouter_runner import OpenRouterAgent
+        return OpenRouterAgent(
+            system_instructions=_PROMPT,
+            tools=tools,
+            response_schema=IssueSummary,
+            model="openai/gpt-4o-mini",
+            max_tool_calls=RunLimits.SUBAGENT_MAX_TOOL_CALLS,
+        )
+
     config = LocalAgentConfig(
         system_instructions=_PROMPT,
-        tools=[list_security_issues, read_state, write_state_section],
+        tools=tools,
         response_schema=IssueSummary,
     )
     return Agent(config)

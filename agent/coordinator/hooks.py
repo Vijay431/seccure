@@ -7,6 +7,45 @@ from typing import Any
 
 import httpx
 from google.antigravity.hooks import hooks
+from google.antigravity.hooks.hooks import HookContext, HookResult
+
+from agent.config import RunLimits
+
+
+class MaxIterationsHook(hooks.PreToolCallDecideHook):
+    """Blocks further tool calls once the coordinator hits its call budget.
+
+    Uses the ADK's ``PreToolCallDecideHook`` so the framework itself prevents
+    the call rather than the agent crashing mid-flight.  Returning
+    ``HookResult(allow=False)`` causes the ADK to surface the ``message`` back
+    to the model, giving it a chance to emit a graceful final response instead
+    of an unhandled exception.
+
+    The limit is read from ``RunLimits.COORDINATOR_MAX_TOOL_CALLS`` which
+    honours the ``SECCURE_COORDINATOR_MAX_TOOLS`` env-var.
+    """
+
+    def __init__(self) -> None:
+        self._call_count: int = 0
+        self._limit: int = RunLimits.COORDINATOR_MAX_TOOL_CALLS
+
+    async def run(self, context: HookContext, data: Any) -> HookResult:  # noqa: ANN401
+        self._call_count += 1
+        tool_name = getattr(data, "tool_name", "?")
+        print(
+            f"[Seccure] Tool call #{self._call_count}/{self._limit}: {tool_name}"
+        )
+        if self._call_count > self._limit:
+            msg = (
+                f"[Seccure] MaxIterationsHook: coordinator has exceeded its "
+                f"{self._limit}-tool-call budget. No further tools will be "
+                f"invoked. Please emit your final summary now without calling "
+                f"any more tools. Increase SECCURE_COORDINATOR_MAX_TOOLS if "
+                f"this repo genuinely requires more steps."
+            )
+            print(msg)
+            return HookResult(allow=False, message=msg)
+        return HookResult(allow=True)
 
 
 class FallbackHook(hooks.OnToolErrorHook):

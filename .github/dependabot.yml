@@ -5,15 +5,17 @@ updates:
     schedule:
       interval: "weekly"
     labels:
-      - "dependencies"
+      - "dependabot"
+      - "security"
       - "python"
-    
+
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
     labels:
-      - "dependencies"
+      - "dependabot"
+      - "security"
       - "docker"
 
   - package-ecosystem: "github-actions"
@@ -21,5 +23,6 @@ updates:
     schedule:
       interval: "weekly"
     labels:
-      - "dependencies"
+      - "dependabot"
+      - "security"
       - "github-actions"

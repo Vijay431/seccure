@@ -1,0 +1,150 @@
+name: 🏷️ Dependabot Label Sync
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Keeps Dependabot PRs in sync with Seccure's label taxonomy.
+#
+# Trigger 1 — pull_request (types: opened, reopened, synchronize)
+#   Fires whenever Dependabot opens or updates a PR.  The job exits silently
+#   if the actor is not dependabot[bot], so the workflow is safe to leave on
+#   for all PR activity.
+#
+# Trigger 2 — workflow_dispatch (manual / one-shot back-fill)
+#   Run once via "Actions → Dependabot Label Sync → Run workflow" to apply
+#   labels to all existing open Dependabot PRs that were created before this
+#   workflow existed.
+# ──────────────────────────────────────────────────────────────────────────────
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry-run only — print what would be labelled without making changes"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  pull-requests: write   # add labels
+  contents: read         # read PR metadata
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1: label a single PR (fires on pull_request event)
+  # ────────────────────────────────────────────────────────────────────────────
+  label-single:
+    name: Label PR #${{ github.event.pull_request.number }}
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+
+    steps:
+      - name: Determine labels for this PR
+        id: resolve
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          labels="dependabot,security"
+
+          case "$BRANCH" in
+            dependabot/pip/*)             labels="$labels,python" ;;
+            dependabot/docker/*)          labels="$labels,docker" ;;
+            dependabot/github-actions/*)  labels="$labels,github-actions" ;;
+            dependabot/github_actions/*)  labels="$labels,github-actions" ;;
+            dependabot/npm_and_yarn/*)    labels="$labels,javascript" ;;
+            dependabot/cargo/*)           labels="$labels,rust" ;;
+            dependabot/gomod/*)           labels="$labels,go" ;;
+          esac
+
+          echo "labels=$labels" >> "$GITHUB_OUTPUT"
+          echo "Resolved labels: $labels"
+
+      - name: Apply labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          LABELS: ${{ steps.resolve.outputs.labels }}
+          REPO: ${{ github.repository }}
+        run: |
+          IFS=',' read -ra label_array <<< "$LABELS"
+          for lbl in "${label_array[@]}"; do
+            echo "Adding label: $lbl"
+            gh pr edit "$PR" --add-label "$lbl" --repo "$REPO"
+          done
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 2: back-fill ALL existing open Dependabot PRs (fires on workflow_dispatch)
+  # ────────────────────────────────────────────────────────────────────────────
+  backfill:
+    name: Back-fill existing Dependabot PRs
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Fetch all open Dependabot PRs
+        id: fetch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr list \
+            --repo "$REPO" \
+            --author "app/dependabot" \
+            --state open \
+            --json number,headRefName \
+            --limit 100 \
+            > /tmp/dependabot_prs.json
+
+          count=$(jq length /tmp/dependabot_prs.json)
+          echo "Found $count open Dependabot PRs"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+      - name: Apply labels to each PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          jq -c '.[]' /tmp/dependabot_prs.json | while IFS= read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            branch=$(echo "$pr" | jq -r '.headRefName')
+
+            labels="dependabot security"
+
+            case "$branch" in
+              dependabot/pip/*)             labels="$labels python" ;;
+              dependabot/docker/*)          labels="$labels docker" ;;
+              dependabot/github-actions/*)  labels="$labels github-actions" ;;
+              dependabot/github_actions/*)  labels="$labels github-actions" ;;
+              dependabot/npm_and_yarn/*)    labels="$labels javascript" ;;
+              dependabot/cargo/*)           labels="$labels rust" ;;
+              dependabot/gomod/*)           labels="$labels go" ;;
+            esac
+
+            echo "PR #$number ($branch) -> labels: $labels"
+
+            if [ "$DRY_RUN" != "true" ]; then
+              for lbl in $labels; do
+                gh pr edit "$number" --add-label "$lbl" --repo "$REPO" || \
+                  echo "  Label '$lbl' not found — skipping (create it first)"
+              done
+              echo "  PR #$number labelled"
+            else
+              echo "  [DRY RUN] would apply: $labels"
+            fi
+          done
+
+      - name: Summary
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          COUNT: ${{ steps.fetch.outputs.count }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "### 🏷️ Dry-run complete — $COUNT PRs inspected, no changes made" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ✅ Label sync complete — $COUNT Dependabot PRs labelled" >> "$GITHUB_STEP_SUMMARY"
+          fi

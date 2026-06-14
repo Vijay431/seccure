@@ -24,6 +24,10 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    "langsmith==0.8.15",
+    "pydantic==2.13.4",
+]
 
 [tool.ruff]
 line-length = 88

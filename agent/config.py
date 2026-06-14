@@ -53,6 +53,7 @@ class SeccureState(BaseModel):
     repo: str  # "owner/repo"
     default_branch: str = "main"
     fix_branch: str = ""
+    ecosystem: str = "all"  # E.g. "npm", "python", "all"
     constraints: str = ""  # raw text from .seccure/constraints.md (empty = no constraints)
     alerts: list[AlertItem] = Field(default_factory=list)
     dependabot_prs: list[PRItem] = Field(default_factory=list)

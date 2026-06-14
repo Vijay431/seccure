@@ -17,23 +17,19 @@ from agent.tools.git_tools import (
     bump_package_version,
     check_remaining_vulnerabilities,
     clone_repo,
-    commit_changes,
-    create_fix_branch,
     ensure_lockfile,
-    push_branch,
     run_auto_fix,
 )
 from agent.tools.github_write import (
-    add_labels,
     check_existing_seccure_pr,
     close_seccure_pr,
     create_conflict_issue,
-    create_pull_request,
     get_default_branch,
 )
 from agent.tools.github_read import fetch_ci_logs_for_pr
 from agent.tools.observability import log_token_usage
 from agent.tools.repo_constraints import read_repo_constraints
+from agent.db import log_action, query_past_actions
 
 
 def build_coordinator(system_prompt: str) -> Agent:
@@ -59,21 +55,19 @@ def build_coordinator(system_prompt: str) -> Agent:
         get_default_branch,
         # Git / npm operations
         clone_repo,
-        create_fix_branch,
         ensure_lockfile,
         run_auto_fix,
         apply_package_override,
         bump_package_version,
         check_remaining_vulnerabilities,
-        commit_changes,
-        push_branch,
         # GitHub write operations
-        create_pull_request,
-        add_labels,
         create_conflict_issue,
         fetch_ci_logs_for_pr,
         # Observability
         log_token_usage,
+        # DB tools
+        log_action,
+        query_past_actions,
     ]
 
     # Add LangSmith tracing to tools if enabled
@@ -88,20 +82,24 @@ def build_coordinator(system_prompt: str) -> Agent:
     provider = os.environ.get("LLM_PROVIDER", "antigravity").lower()
     if provider == "openrouter":
         from agent.openrouter_runner import OpenRouterAgent
-        from agent.subagents.issue_agent import build_issue_agent
+        from agent.subagents.audit_issue_agent import build_audit_issue_agent
+        from agent.subagents.audit_pr_agent import build_audit_pr_agent
+        from agent.subagents.audit_security_agent import build_audit_security_agent
         from agent.subagents.pr_agent import build_pr_agent
-        from agent.subagents.security_agent import build_security_agent
         
         async def invoke_subagent(TypeName: str, Role: str, Prompt: str) -> str:
-            if TypeName == "IssueAgent":
-                from agent.subagents.issue_agent import build_issue_agent
-                agent = build_issue_agent()
+            if TypeName == "AuditIssueAgent":
+                from agent.subagents.audit_issue_agent import build_audit_issue_agent
+                agent = build_audit_issue_agent()
+            elif TypeName == "AuditPRAgent":
+                from agent.subagents.audit_pr_agent import build_audit_pr_agent
+                agent = build_audit_pr_agent()
+            elif TypeName == "AuditSecurityAgent":
+                from agent.subagents.audit_security_agent import build_audit_security_agent
+                agent = build_audit_security_agent()
             elif TypeName == "PRAgent":
                 from agent.subagents.pr_agent import build_pr_agent
                 agent = build_pr_agent()
-            elif TypeName == "SecurityAgent":
-                from agent.subagents.security_agent import build_security_agent
-                agent = build_security_agent()
             else:
                 return "Error: Unknown TypeName"
                 
@@ -109,18 +107,19 @@ def build_coordinator(system_prompt: str) -> Agent:
                 response = await a.chat(Prompt)
                 text = await response.text()
                 
-                try:
-                    import json
-                    from agent.state import write_state_section
-                    data = json.loads(text)
-                    if TypeName == "IssueAgent":
-                        write_state_section("security_issues", data)
-                    elif TypeName == "PRAgent":
-                        write_state_section("dependabot_prs", data)
-                    elif TypeName == "SecurityAgent":
-                        write_state_section("alerts", data)
-                except Exception as e:
-                    pass
+                if TypeName in ["AuditIssueAgent", "AuditPRAgent", "AuditSecurityAgent"]:
+                    try:
+                        import json
+                        from agent.state import write_state_section
+                        data = json.loads(text)
+                        if TypeName == "AuditIssueAgent":
+                            write_state_section("security_issues", data)
+                        elif TypeName == "AuditPRAgent":
+                            write_state_section("dependabot_prs", data)
+                        elif TypeName == "AuditSecurityAgent":
+                            write_state_section("alerts", data)
+                    except Exception as e:
+                        pass
                     
                 return text
                 

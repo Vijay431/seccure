@@ -83,10 +83,11 @@ async def main() -> None:
     """Main entrypoint — initialise state and run the Coordinator."""
     run_id = os.environ["GITHUB_RUN_ID"]
     repo = os.environ.get("TARGET_REPO") or os.environ["GITHUB_REPOSITORY"]
+    ecosystem = os.environ.get("ECOSYSTEM", "all").lower()
     today = date.today().strftime("%Y%m%d")
     fix_branch = f"seccure/auto-fix-{today}"
 
-    print(f"[Seccure] Starting run {run_id} for repo: {repo}")
+    print(f"[Seccure] Starting run {run_id} for repo: {repo} (ecosystem: {ecosystem})")
     print(f"[Seccure] Fix branch: {fix_branch}")
 
     # 1. Load repo-specific constraints (may be empty string)
@@ -100,6 +101,7 @@ async def main() -> None:
     state = SeccureState(
         run_id=run_id,
         repo=repo,
+        ecosystem=ecosystem,
         fix_branch=fix_branch,
         constraints=constraints,
     )
@@ -113,14 +115,15 @@ async def main() -> None:
 
     task_prompt = f"""
 You are the Seccure Coordinator. Your job is to:
-1. Spawn IssueAgent, PRAgent, and SecurityAgent in parallel to gather security data.
+1. Spawn AuditIssueAgent, AuditPRAgent, and AuditSecurityAgent in parallel to gather security data.
 2. Read the shared state summary.
 3. If there is nothing to fix, exit cleanly with status 'nothing_to_fix'.
-4. Otherwise, clone the target repo, apply npm and Python vulnerability fixes, and open a consolidated PR.
+4. Otherwise, clone the target repo, apply npm and Python vulnerability fixes, validate them locally, and then invoke PRAgent to create a consolidated PR.
 
 Target repository: {repo}
 Run ID: {run_id}
 Fix branch: {fix_branch}
+Target Ecosystem: {ecosystem}
 
 Begin now. Follow your system instructions exactly.
 """

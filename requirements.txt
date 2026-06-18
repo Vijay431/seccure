@@ -1,5 +1,5 @@
 google-antigravity
 httpx>=0.27.0
 pydantic>=2.7.0
-langsmith>=0.1.0
+langsmith>=0.8.16
 openai>=1.0.0

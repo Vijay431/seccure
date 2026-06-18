@@ -38,7 +38,7 @@ jobs:
       ADDITIONAL_CONSTRAINTS: ${{ inputs.additional_constraints || '' }}
     steps:
       - name: Checkout target repo (to read .seccure/constraints.md)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.target_repo || github.repository }}
           path: target_repo

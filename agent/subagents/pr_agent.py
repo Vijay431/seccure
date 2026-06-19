@@ -10,7 +10,10 @@ from agent.config import RunLimits
 from agent.resilient_runner import ResilientOpenRouterAgent as OpenRouterAgent
 from agent.state import read_state, write_state_section
 from agent.tools.git_tools import commit_changes, create_fix_branch, push_branch
-from agent.tools.github_write import (
+from agent.tools.github_pulls import (
+    check_existing_seccure_pr,
+    close_seccure_pr,
+    get_default_branch,
     upsert_seccure_pr,
 )
 

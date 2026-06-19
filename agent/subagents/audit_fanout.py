@@ -13,11 +13,11 @@ from google.antigravity import ToolContext
 
 from agent.config import CodeScanningFinding, DependencyFinding, ToolResult
 from agent.state import write_state_section
-from agent.tools.github_read import (
+from agent.tools.github_issues import list_security_issues
+from agent.tools.github_pulls import list_dependabot_prs
+from agent.tools.github_security import (
     list_code_scanning_alerts,
     list_dependabot_alerts,
-    list_dependabot_prs,
-    list_security_issues,
 )
 
 AuditCallable = Callable[..., str | Awaitable[str]]

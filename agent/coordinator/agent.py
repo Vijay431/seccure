@@ -18,13 +18,13 @@ from agent.tools.git_tools import (
     ensure_lockfile,
     run_auto_fix,
 )
-from agent.tools.github_read import fetch_ci_logs_for_pr
-from agent.tools.github_write import (
+from agent.tools.github_pulls import fetch_ci_logs_for_pr
+from agent.tools.github_pulls import (
     check_existing_seccure_pr,
     close_seccure_pr,
-    create_conflict_issue,
     get_default_branch,
 )
+from agent.tools.github_issues import create_conflict_issue
 from agent.tools.observability import log_token_usage
 from agent.tools.repo_constraints import read_repo_constraints
 

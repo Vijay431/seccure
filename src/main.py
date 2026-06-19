@@ -35,7 +35,7 @@ from src.lib.state import init_state  # noqa: E402
 from src.pipelines.coordinator.agent import build_coordinator  # noqa: E402
 from src.utils.repo_constraints import load_constraints_text  # noqa: E402
 
-_BASE_PROMPT_PATH = Path(__file__).parent / "coordinator" / "prompt.md"
+_BASE_PROMPT_PATH = Path(__file__).parent / "pipelines" / "coordinator" / "prompt.md"
 
 
 def _build_system_prompt(constraints: str) -> str:

@@ -11,6 +11,7 @@ import os
 import re
 from typing import Any
 
+import httpx
 from google.antigravity import ToolContext
 
 from agent.tools.github_client import get, get_text
@@ -106,7 +107,7 @@ def list_dependabot_prs(ctx: ToolContext) -> str:
             break
         for pr in batch:
             login = pr.get("user", {}).get("login", "")
-            if login in ("dependabot[bot]", "dependabot"):
+            if "dependabot" in login.lower():
                 title: str = pr.get("title", "")
                 pkg, from_v, to_v = _parse_dependabot_title(title)
                 results.append(
@@ -170,9 +171,16 @@ def list_dependabot_alerts(ctx: ToolContext) -> str:
                 per_page=100,
                 page=page,
             )
-        except Exception:
-            # If dependabot alerts are disabled or return 403, just return an empty list
-            batch = []
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 403:
+                raise PermissionError(
+                    "GitHub Dependabot alerts API returned 403; "
+                    "security_events permission is required."
+                ) from exc
+            if exc.response.status_code == 404:
+                batch = []
+            else:
+                raise
 
         if not isinstance(batch, list) or not batch:
             break
@@ -190,8 +198,11 @@ def list_dependabot_alerts(ctx: ToolContext) -> str:
                     "alert_number": alert["number"],
                     "cve_id": cve_id,
                     "package": sv.get("package", {}).get("name", "unknown"),
+                    "ecosystem": sv.get("package", {}).get("ecosystem", "unknown"),
                     "severity": sa.get("severity", "unknown"),
-                    "patched_version": first_patched.get("identifier") if first_patched else None,
+                    "patched_version": (
+                        first_patched.get("identifier") if first_patched else None
+                    ),
                     "advisory_url": sa.get("html_url", ""),
                 }
             )
@@ -217,7 +228,15 @@ def list_code_scanning_alerts(ctx: ToolContext) -> str:
     repo = _repo()
     try:
         batch = get(f"/repos/{repo}/code-scanning/alerts", state="open", per_page=100)
-    except Exception:  # noqa: BLE001 — code scanning may not be enabled
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 403:
+            raise PermissionError(
+                "GitHub code scanning API returned 403; "
+                "security_events permission is required."
+            ) from exc
+        if exc.response.status_code != 404:
+            raise
+        print("[Seccure] Warning: code scanning alerts unavailable; treating as empty.")
         payload = json.dumps([])
         ctx.set_state("raw_code_scanning_alerts", payload)
         return payload
@@ -245,10 +264,10 @@ def list_code_scanning_alerts(ctx: ToolContext) -> str:
 
 def fetch_ci_logs_for_pr(pr_number: int) -> str:
     """Fetch GitHub Action CI logs for the failed checks on a PR.
-    
+
     Args:
         pr_number: The pull request number.
-        
+
     Returns:
         A concatenated string of the tail of the logs from all failed jobs.
     """
@@ -257,7 +276,7 @@ def fetch_ci_logs_for_pr(pr_number: int) -> str:
         pr = get(f"/repos/{repo}/pulls/{pr_number}")
     except Exception as e:
         return f"Error fetching PR: {e}"
-        
+
     head_sha = pr.get("head", {}).get("sha")
     if not head_sha:
         return "PR head sha not found."
@@ -266,16 +285,16 @@ def fetch_ci_logs_for_pr(pr_number: int) -> str:
         checks = get(f"/repos/{repo}/commits/{head_sha}/check-runs")
     except Exception as e:
         return f"Error fetching check runs: {e}"
-        
+
     if not isinstance(checks, dict):
         return "Invalid check runs response."
-        
+
     runs = checks.get("check_runs", [])
     failed_runs = [r for r in runs if r.get("conclusion") in ("failure", "timed_out")]
-    
+
     if not failed_runs:
         return "No failed check runs found. Pipeline might be green or still running."
-        
+
     logs_summary = []
     for run in failed_runs:
         job_id = run.get("id")
@@ -287,5 +306,5 @@ def fetch_ci_logs_for_pr(pr_number: int) -> str:
             logs_summary.append(log_text[-5000:])
         except Exception as e:
             logs_summary.append(f"Could not fetch logs: {e}")
-            
+
     return "\n\n".join(logs_summary)

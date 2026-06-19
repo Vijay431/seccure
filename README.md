@@ -33,10 +33,10 @@ gh label create "auto-fix"   --color "059669"
 gh label create "conflict"   --color "f59e0b"
 ```
 
-Add your Gemini API key as a repository secret:
+Add your OpenRouter API key as a repository secret:
 - **Settings → Secrets and variables → Actions → New repository secret**
-- Name: `GEMINI_API_KEY`
-- Value: Your key from [Google AI Studio](https://aistudio.google.com/app/api-keys)
+- Name: `OPENROUTER_API_KEY`
+- Value: Your key from [OpenRouter](https://openrouter.ai/)
 
 ### 2. Add the Workflow
 
@@ -75,7 +75,7 @@ jobs:
       - name: Run Seccure Agent
         uses: docker://ghcr.io/owner/seccure:latest
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
           TARGET_REPO: ${{ inputs.target_repo || github.repository }}
           ADDITIONAL_CONSTRAINTS: ${{ inputs.additional_constraints || '' }}
@@ -113,9 +113,10 @@ If a constraint blocks a fix, Seccure will skip the patch and automatically crea
   <img src="assets/architecture.png" alt="Seccure Multi-Agent Architecture Diagram" width="800" />
 </div>
 
-Seccure uses a **Coordinator-Subagent architecture** driven by `google-antigravity-sdk`:
+Seccure uses a **Coordinator-Subagent architecture** driven by OpenRouter:
 
-1. **Coordinator Agent** (`gemini-2.5-pro`): Orchestrates the entire flow. It has access to safe, Python-wrapped subprocess shell tools (`git clone`, `npm audit fix`) and GitHub write tools.
-2. **IssueAgent**, **PRAgent**, **SecurityAgent** (`gemini-2.0-flash`): Narrow-context subagents that read GitHub APIs and write structured Pydantic summaries (`AlertSummary`, etc.) to a shared JSON state file.
+1. **Coordinator Agent** (`openai/gpt-5-nano` via OpenRouter): Orchestrates the entire flow. It has access to safe, Python-wrapped subprocess shell tools (`git clone`, `npm audit fix`) and GitHub write tools.
+2. **IssueAgent**, **PRAgent**, **SecurityAgent** (`openai/gpt-4o-mini` via OpenRouter): Narrow-context subagents that read GitHub APIs and write structured Pydantic summaries (`AlertSummary`, etc.) to a shared JSON state file.
 
-All LLM actions are unattended and self-correcting (via the ADK `FallbackHook` intercepting API and shell errors).
+All LLM actions run unattended through deterministic Python tools with bounded
+tool-call budgets and redacted logs.

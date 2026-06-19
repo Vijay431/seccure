@@ -1,28 +1,28 @@
-version: 2
 updates:
-  - package-ecosystem: "pip"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependabot"
-      - "security"
-      - "python"
-
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependabot"
-      - "security"
-      - "docker"
-
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependabot"
-      - "security"
-      - "github-actions"
+- directory: /
+  labels:
+  - dependabot
+  - security
+  - python
+  package-ecosystem: pip
+  schedule:
+    interval: weekly
+- directory: /
+  labels:
+  - dependabot
+  - security
+  - docker
+  package-ecosystem: docker
+  schedule:
+    interval: weekly
+- directory: /
+  ignore:
+  - dependency-name: "github/gh-aw-actions" # Managed by gh aw compile. Version-locked to the gh-aw compiler; do not bump.
+  labels:
+  - dependabot
+  - security
+  - github-actions
+  package-ecosystem: github-actions
+  schedule:
+    interval: weekly
+version: 2

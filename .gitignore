@@ -22,7 +22,12 @@ htmlcov/
 *.swp
 *.swo
 
+# AI files
+.agent/
+.specify/
+specs/
+
 # OS files
 .DS_Store
 Thumbs.db
-\n.env
+.venv/

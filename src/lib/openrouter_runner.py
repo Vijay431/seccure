@@ -7,7 +7,7 @@ from typing import Any
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from agent.config import RunLimits
+from src.config.config import RunLimits
 
 
 class OpenRouterResponse:

@@ -1,7 +1,10 @@
 import json
 import subprocess
+
 from google.antigravity import ToolContext
-from agent.tools.gh_wrapper import run_gh_command
+
+from src.utils.gh_wrapper_v2 import run_gh_command
+
 
 def list_dependabot_alerts(ctx: ToolContext) -> str:
     """Fetch all open Dependabot vulnerability alerts."""
@@ -14,7 +17,9 @@ def list_dependabot_alerts(ctx: ToolContext) -> str:
             "api", "/repos/{owner}/{repo}/dependabot/alerts",
             "-X", "GET",
             "-f", "state=open",
-            "--paginate"
+            "-F", "per_page=30",
+            "-F", "sort=severity",
+            "-F", "direction=desc"
         ])
     except subprocess.CalledProcessError as exc:
         if "403" in str(exc) or "404" in str(exc):
@@ -26,6 +31,12 @@ def list_dependabot_alerts(ctx: ToolContext) -> str:
 
     results = []
     if data:
+        if len(data) == 30:
+            import sys
+            msg = "[Seccure] Warning: Dependabot alerts truncated to 30 items."
+            print(msg, file=sys.stderr)
+            ctx.set_state("dependabot_warning", msg)
+
         for alert in data:
             sa = alert.get("security_advisory", {})
             sv = alert.get("security_vulnerability", {})
@@ -72,6 +83,16 @@ def list_code_scanning_alerts(ctx: ToolContext) -> str:
 
     results = []
     if data:
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "error": 1, "warning": 2, "note": 3, "unknown": 4}
+        data.sort(key=lambda a: severity_order.get(str(a.get("rule", {}).get("severity", "unknown")).lower(), 99))
+
+        if len(data) > 30:
+            import sys
+            msg = f"[Seccure] Warning: Code scanning alerts truncated from {len(data)} to 30 items."
+            print(msg, file=sys.stderr)
+            ctx.set_state("code_scanning_warning", msg)
+            data = data[:30]
+
         for a in data:
             results.append({
                 "number": a["number"],

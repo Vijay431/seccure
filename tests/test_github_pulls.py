@@ -1,7 +1,11 @@
-import pytest
-from unittest.mock import patch, MagicMock
 import json
-from agent.tools.github_pulls import extract_references_from_commits, bulk_validate_references
+from unittest.mock import MagicMock, patch
+
+from src.utils.github_pulls import (
+    bulk_validate_references,
+    extract_references_from_commits,
+)
+
 
 def test_extract_references_from_commits():
     messages = [
@@ -13,12 +17,12 @@ def test_extract_references_from_commits():
     refs = extract_references_from_commits(messages)
     assert refs == ["123", "456", "789", "999"]
 
-@patch("agent.tools.github_pulls.subprocess.run")
+@patch("src.utils.github_pulls.subprocess.run")
 def test_bulk_validate_references_success(mock_run):
     # Mock repo info
     repo_mock = MagicMock()
     repo_mock.stdout = json.dumps({"owner": {"login": "testowner"}, "name": "testrepo"})
-    
+
     # Mock graphql success
     gql_mock = MagicMock()
     gql_mock.stdout = json.dumps({
@@ -30,13 +34,13 @@ def test_bulk_validate_references_success(mock_run):
             }
         }
     })
-    
+
     mock_run.side_effect = [repo_mock, gql_mock]
-    
+
     valid_refs = bulk_validate_references(["123", "456", "789"])
     assert valid_refs == ["123", "456"]
 
-@patch("agent.tools.github_pulls.subprocess.run")
+@patch("src.utils.github_pulls.subprocess.run")
 def test_bulk_validate_references_fallback_on_error(mock_run):
     mock_run.side_effect = Exception("GH CLI not found")
     # If the gh cli fails entirely, it should fallback to returning original references

@@ -30,12 +30,12 @@ load_dotenv()
 # Ensure the root directory is in sys.path so 'agent' module can be found
 sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
 
-from agent.config import RunLimits, SeccureState  # noqa: E402
-from agent.coordinator.agent import build_coordinator  # noqa: E402
-from agent.state import init_state  # noqa: E402
-from agent.tools.repo_constraints import load_constraints_text  # noqa: E402
+from src.config.config import RunLimits, SeccureState  # noqa: E402
+from src.lib.state import init_state  # noqa: E402
+from src.pipelines.coordinator.agent import build_coordinator  # noqa: E402
+from src.utils.repo_constraints import load_constraints_text  # noqa: E402
 
-_BASE_PROMPT_PATH = Path(__file__).parent / "coordinator" / "prompt.md"
+_BASE_PROMPT_PATH = Path(__file__).parent / "pipelines" / "coordinator" / "prompt.md"
 
 
 def _build_system_prompt(constraints: str) -> str:
@@ -113,7 +113,7 @@ async def main() -> None:
         ),
     )
     init_state(state)
-    from agent.state import _state_path
+    from src.lib.state import _state_path
     print(f"[Seccure] State initialised at {_state_path(run_id)}")
 
     # 3. Build Coordinator with dynamically injected constraints

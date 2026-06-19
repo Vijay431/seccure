@@ -1,7 +1,10 @@
 import json
 from datetime import date
+
 from google.antigravity import ToolContext
-from agent.tools.gh_wrapper import run_gh_command
+
+from src.utils.gh_wrapper_v2 import run_gh_command
+
 
 def list_security_issues(ctx: ToolContext) -> str:
     """Fetch all open GitHub issues labelled 'security' or 'dependabot'.
@@ -14,18 +17,24 @@ def list_security_issues(ctx: ToolContext) -> str:
 
     results = []
     seen = set()
-    
+
     for label in ("security", "dependabot"):
         data = run_gh_command([
-            "issue", "list", 
-            "--label", label, 
+            "issue", "list",
+            "--label", label,
             "--state", "open",
-            "--limit", "1000",
+            "--limit", "30",
             "--json", "number,title,labels,url"
         ])
         if not data:
             continue
-            
+
+        if len(data) == 30:
+            import sys
+            msg = f"[Seccure] Warning: Security issues for label '{label}' truncated to 30 items."
+            print(msg, file=sys.stderr)
+            ctx.set_state(f"issues_warning_{label}", msg)
+
         for issue in data:
             num = issue["number"]
             if num in seen:
@@ -80,7 +89,7 @@ Seccure Agent attempted all fix strategies and failed.
     # gh issue create doesn't support --json. It outputs the URL.
     # We can fetch the issue number from the URL or just fetch the latest issue.
     # It outputs just the URL to stdout if not tty, let's extract the number.
-    
+
     # Actually we can do gh issue view <url> --json number,url
     url = data.strip()
     issue_data = run_gh_command(["issue", "view", url, "--json", "number,url"])

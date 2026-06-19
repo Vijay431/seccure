@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from agent.config import DependencyFinding
+from src.config.config import DependencyFinding
 
 _NODE_ECOSYSTEMS = {"npm", "yarn", "pnpm", "javascript", "node"}
 _PYTHON_ECOSYSTEMS = {"pip", "pipenv", "poetry", "uv", "python"}

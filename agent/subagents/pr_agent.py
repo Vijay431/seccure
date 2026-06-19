@@ -1,47 +1,54 @@
-"""PRAgent — fetches and processes open Dependabot pull requests.
+"""PRAgent — post-fix agent that handles Git and GitHub operations.
 
-Narrow context: only sees the pulls API response.
-Writes a validated PRSummary to shared state.
+Reads the shared state and uses tools to create a fix branch, commit changes,
+push the branch, and open or update a consolidated pull request.
 """
 
 from __future__ import annotations
 
-from google.antigravity import Agent, LocalAgentConfig
-
-from agent.config import PRSummary, RunLimits
+from agent.config import RunLimits
+from agent.resilient_runner import ResilientOpenRouterAgent as OpenRouterAgent
 from agent.state import read_state, write_state_section
-from agent.tools.github_read import list_dependabot_prs
+from agent.tools.git_tools import commit_changes, create_fix_branch, push_branch
+from agent.tools.github_pulls import (
+    check_existing_seccure_pr,
+    close_seccure_pr,
+    get_default_branch,
+    upsert_seccure_pr,
+)
 
-_PROMPT = """You are the PRAgent for the Seccure security automation system.
+_PROMPT = """
+You are the PRAgent (post-fix agent) for the Seccure security automation system.
 
-You MUST follow these steps exactly:
-1. CALL `list_dependabot_prs()` tool to fetch all open PRs by dependabot[bot].
-2. STOP and wait for the tool output. Do NOT hallucinate data.
-3. Once you receive the tool output, extract the data.
-4. CALL `write_state_section()` tool with section="dependabot_prs" and the extracted data.
-5. Output the EXACT SAME JSON: {"items": [...], "count": N}
+The Coordinator has already applied the security fixes locally. Your job is to:
+1. CALL `read_state()` to get the current SeccureState JSON.
+2. CALL `create_fix_branch(branch_name)` using the fix_branch from state.
+3. CALL `commit_changes()` to commit the fixes.
+4. If commit returns "Nothing to commit", exit cleanly.
+5. CALL `push_branch(branch_name, repo)`.
+6. CALL `upsert_seccure_pr(state_json, head_branch, base_branch, existing_pr_number)`.
+7. CALL `write_state_section('pr_number', pr_number)` from the upsert result.
+8. CALL `write_state_section('status', 'done')`.
+
+Do not write PR markdown yourself. The PR title, body, labels, hidden attempt
+marker, and Closes references are rendered by deterministic Python code.
 """
 
 
-def build_pr_agent() -> Agent | "OpenRouterAgent":
-    """Build and return the PRAgent instance."""
-    import os
-    provider = os.environ.get("LLM_PROVIDER", "antigravity").lower()
-    tools = [list_dependabot_prs, read_state, write_state_section]
-    
-    if provider == "openrouter":
-        from agent.openrouter_runner import OpenRouterAgent
-        return OpenRouterAgent(
-            system_instructions=_PROMPT,
-            tools=tools,
-            response_schema=PRSummary,
-            model="openai/gpt-4o-mini",
-            max_tool_calls=RunLimits.SUBAGENT_MAX_TOOL_CALLS,
-        )
+def build_pr_agent() -> OpenRouterAgent:
+    """Build and return the PRAgent instance for post-fix operations."""
+    tools = [
+        read_state,
+        write_state_section,
+        create_fix_branch,
+        commit_changes,
+        push_branch,
+        upsert_seccure_pr,
+    ]
 
-    config = LocalAgentConfig(
+    return OpenRouterAgent(
         system_instructions=_PROMPT,
         tools=tools,
-        response_schema=PRSummary,
+        model="openai/gpt-5-nano",
+        max_tool_calls=RunLimits.SUBAGENT_MAX_TOOL_CALLS,
     )
-    return Agent(config)

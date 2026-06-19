@@ -1,8 +1,8 @@
-import asyncio
 import inspect
 import json
 import os
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -21,10 +21,10 @@ class OpenRouterAgent:
     def __init__(
         self,
         system_instructions: str,
-        tools: Optional[List[Callable]] = None,
+        tools: list[Callable] | None = None,
         model: str = "deepseek/deepseek-chat",
-        response_schema: Optional[Any] = None,
-        max_tool_calls: Optional[int] = None,
+        response_schema: Any | None = None,
+        max_tool_calls: int | None = None,
     ):
         self.system_prompt = system_instructions
         self.tools = tools or []
@@ -40,26 +40,78 @@ class OpenRouterAgent:
             api_key=os.environ.get("OPENROUTER_API_KEY", ""),
         )
         if tools:
-            system_instructions += "\n\nCRITICAL: You MUST call the provided tools to gather data FIRST. Do not generate the final response until you have successfully executed the required tools."
+            system_instructions += (
+                "\n\nCRITICAL: You MUST call the provided tools to gather data "
+                "FIRST. Do not generate the final response until you have "
+                "successfully executed the required tools."
+            )
         self.messages = [{"role": "system", "content": system_instructions}]
         self.tool_map = {t.__name__: t for t in self.tools}
-        
+        self.prompt_token_count = 0
+        self.candidates_token_count = 0
+        self.total_token_count = 0
+
+    @staticmethod
+    def _is_tool_context_param(param: inspect.Parameter) -> bool:
+        return "ToolContext" in str(param.annotation)
+
+    @staticmethod
+    def _is_injected_param(param: inspect.Parameter) -> bool:
+        if OpenRouterAgent._is_tool_context_param(param):
+            return True
+        if param.default is not inspect.Parameter.empty and callable(param.default):
+            return True
+        return "callable" in str(param.annotation).lower()
+
+    @staticmethod
+    def _serialize_tool_result(result: Any) -> str:
+        if isinstance(result, BaseModel):
+            return result.model_dump_json()
+        try:
+            return json.dumps(result)
+        except TypeError:
+            return str(result)
+
+    @staticmethod
+    def _prepare_tool_args(
+        func: Callable,
+        supplied_args: dict[str, Any],
+    ) -> dict[str, Any]:
+        sig = inspect.signature(func)
+        args: dict[str, Any] = {}
+        for name, param in sig.parameters.items():
+            if OpenRouterAgent._is_tool_context_param(param):
+                class DummyContext:
+                    def __init__(self):
+                        self.state = {}
+                    def get_state(self, key):
+                        return self.state.get(key)
+                    def set_state(self, key, val):
+                        self.state[key] = val
+                args[name] = DummyContext()
+            elif (
+                not OpenRouterAgent._is_injected_param(param)
+                and name in supplied_args
+            ):
+                args[name] = supplied_args[name]
+        return args
+
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass
 
-    def _get_tool_schemas(self) -> List[Dict]:
+    def _get_tool_schemas(self) -> list[dict]:
         schemas = []
         for tool in self.tools:
             sig = inspect.signature(tool)
             properties = {}
             required = []
             for name, param in sig.parameters.items():
-                if name == "self" or "ToolContext" in str(param.annotation):
+                if name == "self" or self._is_injected_param(param):
                     continue
-                
+
                 param_type = "string"
                 ann = str(param.annotation).lower()
                 if "int" in ann:
@@ -72,15 +124,15 @@ class OpenRouterAgent:
                     param_type = "array"
                 elif "dict" in ann or "any" in ann:
                     param_type = "object"
-                    
+
                 prop = {"type": param_type}
                 if param_type == "array":
                     prop["items"] = {"type": "string"}
-                    
+
                 properties[name] = prop
                 if param.default == inspect.Parameter.empty:
                     required.append(name)
-                    
+
             desc = (tool.__doc__ or "").strip().split("\n")[0]
             schemas.append({
                 "type": "function",
@@ -120,14 +172,23 @@ class OpenRouterAgent:
                 kwargs["tools"] = self._get_tool_schemas()
                 kwargs["tool_choice"] = "auto"
             if self.response_schema:
-                schema_name = self.response_schema.__name__
                 kwargs["response_format"] = {
                     "type": "json_object"
                 }
 
             response = await self.client.chat.completions.create(**kwargs)
+
+            if hasattr(response, 'usage') and response.usage:
+                self.prompt_token_count += getattr(response.usage, 'prompt_tokens', 0)
+                self.candidates_token_count += getattr(
+                    response.usage,
+                    'completion_tokens',
+                    0,
+                )
+                self.total_token_count += getattr(response.usage, 'total_tokens', 0)
+
             message = response.choices[0].message
-            
+
             # OpenAI python package represents tool_calls as objects
             msg_dict = {"role": message.role}
             if message.content:
@@ -143,89 +204,84 @@ class OpenRouterAgent:
                         }
                     } for t in message.tool_calls
                 ]
-            
+
             self.messages.append(msg_dict)
-            
+
             if not message.tool_calls:
                 content = message.content or ""
                 try:
                     content_json = json.loads(content)
-                    if isinstance(content_json, dict) and "name" in content_json and content_json["name"] in self.tool_map:
+                    if (
+                        isinstance(content_json, dict)
+                        and "name" in content_json
+                        and content_json["name"] in self.tool_map
+                    ):
                         func_name = content_json["name"]
                         args = content_json.get("parameters", {})
                         if "args" in content_json and not args:
                             args = content_json["args"]
-                        print(f"[OpenRouter Fallback] Calling tool: {func_name}({args})")
+                        print(
+                            f"[OpenRouter Fallback] Calling tool: "
+                            f"{func_name}({args})"
+                        )
                         _tool_call_count += 1
-                        
+
                         func = self.tool_map[func_name]
-                        sig = inspect.signature(func)
-                        for name, param in sig.parameters.items():
-                            if "ToolContext" in str(param.annotation):
-                                class DummyContext:
-                                    def __init__(self): self.state = {}
-                                    def get_state(self, key): return self.state.get(key)
-                                    def set_state(self, key, val): self.state[key] = val
-                                args[name] = DummyContext()
-                        
+                        call_args = self._prepare_tool_args(func, args)
+
                         if inspect.iscoroutinefunction(func):
-                            result = await func(**args)
+                            result = await func(**call_args)
                         else:
-                            result = func(**args)
-                            
+                            result = func(**call_args)
+
                         self.messages.append({
                             "role": "user",
-                            "content": f"Tool {func_name} returned:\n{result}"
+                            "content": (
+                                f"Tool {func_name} returned:\n"
+                                f"{self._serialize_tool_result(result)}"
+                            )
                         })
                         continue
                 except Exception:
                     pass
                 return OpenRouterResponse(content)
-                
+
             for tool_call in message.tool_calls:
                 func_name = tool_call.function.name
                 args = json.loads(tool_call.function.arguments)
                 print(f"[OpenRouter] Calling tool: {func_name}({args})")
                 _tool_call_count += 1
-                
+
                 func = self.tool_map.get(func_name)
                 if not func:
                     result = f"Error: Tool {func_name} not found."
                 else:
                     try:
-                        # Inject ToolContext if the tool expects it
-                        sig = inspect.signature(func)
-                        for name, param in sig.parameters.items():
-                            if "ToolContext" in str(param.annotation):
-                                class DummyContext:
-                                    def __init__(self):
-                                        self.state = {}
-                                    def get_state(self, key): return self.state.get(key)
-                                    def set_state(self, key, val): self.state[key] = val
-                                args[name] = DummyContext()
-                                
+                        call_args = self._prepare_tool_args(func, args)
+
                         if inspect.iscoroutinefunction(func):
-                            result = await func(**args)
+                            result = await func(**call_args)
                         else:
-                            result = func(**args)
+                            result = func(**call_args)
                     except Exception as e:
                         result = f"Error: {e}"
-                        
+
                 self.messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call.id,
                     "name": func_name,
-                    "content": str(result)
+                    "content": self._serialize_tool_result(result)
                 })
 
     @property
     def conversation(self):
         class UsageDummy:
-            prompt_token_count = 0
-            candidates_token_count = 0
-            thoughts_token_count = 0
-            total_token_count = 0
+            def __init__(self, agent):
+                self.prompt_token_count = agent.prompt_token_count
+                self.candidates_token_count = agent.candidates_token_count
+                self.thoughts_token_count = 0
+                self.total_token_count = agent.total_token_count
         class ConvDummy:
-            total_usage = UsageDummy()
-        return ConvDummy()
-
+            def __init__(self, agent):
+                self.total_usage = UsageDummy(agent)
+        return ConvDummy(self)

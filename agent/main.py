@@ -7,10 +7,10 @@ Coordinator agent, and runs it to completion (one-shot, unattended CI).
 Environment variables required:
     GITHUB_RUN_ID         GitHub Actions run ID (unique per run)
     GITHUB_TOKEN          GitHub token for API calls and git auth
-    GEMINI_API_KEY        Gemini API key for ADK agent model access
+    OPENROUTER_API_KEY    OpenRouter API key for agent model access
 
 Environment variables optional:
-    TARGET_REPO              Target repository in 'owner/repo' format (defaults to GITHUB_REPOSITORY)
+    TARGET_REPO              Target repo in 'owner/repo' format
     SECCURE_CONSTRAINTS_DIR  Path to directory containing constraints.md
     ADDITIONAL_CONSTRAINTS   One-off constraints from workflow_dispatch input
 """
@@ -19,10 +19,10 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 from datetime import date
 from pathlib import Path
 
-import sys
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -30,10 +30,10 @@ load_dotenv()
 # Ensure the root directory is in sys.path so 'agent' module can be found
 sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
 
-from agent.config import RunLimits, SeccureState
-from agent.coordinator.agent import build_coordinator
-from agent.state import init_state
-from agent.tools.repo_constraints import load_constraints_text
+from agent.config import RunLimits, SeccureState  # noqa: E402
+from agent.coordinator.agent import build_coordinator  # noqa: E402
+from agent.state import init_state  # noqa: E402
+from agent.tools.repo_constraints import load_constraints_text  # noqa: E402
 
 _BASE_PROMPT_PATH = Path(__file__).parent / "coordinator" / "prompt.md"
 
@@ -93,7 +93,10 @@ async def main() -> None:
     # 1. Load repo-specific constraints (may be empty string)
     constraints = load_constraints_text()
     if constraints:
-        print("[Seccure] Repo constraints loaded — will be injected into Coordinator prompt.")
+        print(
+            "[Seccure] Repo constraints loaded — will be injected into "
+            "Coordinator prompt."
+        )
     else:
         print("[Seccure] No repo constraints found — running with default behaviour.")
 
@@ -104,6 +107,10 @@ async def main() -> None:
         ecosystem=ecosystem,
         fix_branch=fix_branch,
         constraints=constraints,
+        agent_events_path=str(
+            Path(os.environ.get("GITHUB_WORKSPACE", "/tmp"))
+            / f"seccure_events_{run_id}.jsonl"
+        ),
     )
     init_state(state)
     from agent.state import _state_path
@@ -115,10 +122,12 @@ async def main() -> None:
 
     task_prompt = f"""
 You are the Seccure Coordinator. Your job is to:
-1. Spawn AuditIssueAgent, AuditPRAgent, and AuditSecurityAgent in parallel to gather security data.
-2. Read the shared state summary.
-3. If there is nothing to fix, exit cleanly with status 'nothing_to_fix'.
-4. Otherwise, clone the target repo, apply npm and Python vulnerability fixes, validate them locally, and then invoke PRAgent to create a consolidated PR.
+1. Fetch all issues, PRs and security events related to fixing the repo.
+2. Create a new branch out of the default branch.
+3. Push the changes.
+4. Create a PR against the default branch.
+
+IMPORTANT: Never ask any questions to the user. The user cannot interrupt actions and the process runs unattended. Make all decisions autonomously based on the provided instructions.
 
 Target repository: {repo}
 Run ID: {run_id}
@@ -135,7 +144,10 @@ Begin now. Follow your system instructions exactly.
     _in_ci = os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
     timeout = RunLimits.TOTAL_RUN_TIMEOUT_SECONDS
     if _in_ci:
-        print("[Seccure] Running in GitHub Actions — local timeout disabled (use workflow timeout-minutes instead).")
+        print(
+            "[Seccure] Running in GitHub Actions — local timeout disabled "
+            "(use workflow timeout-minutes instead)."
+        )
     else:
         print(f"[Seccure] Local run — timeout set to {timeout}s ({timeout // 60} min).")
 
@@ -149,7 +161,7 @@ Begin now. Follow your system instructions exactly.
                     agent.chat(task_prompt),
                     timeout=timeout,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 print(
                     f"\n[Seccure] ⏰ TIMEOUT: coordinator did not complete within "
                     f"{timeout}s ({timeout // 60} min). "

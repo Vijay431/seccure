@@ -6,10 +6,10 @@ Writes a validated PRSummary to shared state.
 
 from __future__ import annotations
 
-from agent.config import PRSummary, RunLimits
-from agent.resilient_runner import ResilientOpenRouterAgent as OpenRouterAgent
-from agent.state import read_state, write_state_section
-from agent.tools.github_pulls import list_dependabot_prs
+from src.config.config import PRSummary, RunLimits
+from src.lib.resilient_runner import ResilientOpenRouterAgent as OpenRouterAgent
+from src.lib.state import read_state, write_state_section
+from src.utils.github_pulls import list_dependabot_prs
 
 _PROMPT = """You are the AuditPRAgent for the Seccure security automation system.
 

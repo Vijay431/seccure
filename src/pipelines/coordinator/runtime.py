@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent.config import ToolResult
+from src.config.config import ToolResult
 
 
 def should_exit_for_tool_result(result: ToolResult) -> bool:

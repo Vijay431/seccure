@@ -17,13 +17,13 @@ _WORKSPACE = Path("/tmp/seccure_workspace")
 def _run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
     """Run a subprocess command. Returns (returncode, stdout, stderr)."""
     working_dir = cwd or _WORKSPACE
-    
+
     # Wrap npm/node commands to use nvm and respect .nvmrc
     if cmd[0] in ("npm", "node", "npx"):
         import shlex
         nvm_dir = os.environ.get("NVM_DIR", "/home/seccure/.nvm")
         escaped_cmd = " ".join(shlex.quote(c) for c in cmd)
-        
+
         bash_script = f"""
         export NVM_DIR="{nvm_dir}"
         [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"
@@ -47,7 +47,7 @@ def _run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
             capture_output=True,
             text=True,
         )
-        
+
     return result.returncode, result.stdout, result.stderr
 
 
@@ -164,7 +164,7 @@ def apply_package_override(package: str, safe_version: str, ecosystem: str = "np
         if code != 0:
             return f"Override written but npm install failed: {err[:500]}"
         return f"Added override: {package} -> {safe_version} and ran npm install."
-    
+
     return f"apply_package_override is not yet supported for ecosystem: {ecosystem}"
 
 
@@ -180,7 +180,7 @@ def bump_package_version(package: str, target_version: str, ecosystem: str = "np
         Confirmation or error.
     """
     ecosystem = ecosystem.lower()
-    
+
     if ecosystem == "npm":
         pkg_path = _WORKSPACE / "package.json"
         if not pkg_path.exists():
@@ -206,13 +206,13 @@ def bump_package_version(package: str, target_version: str, ecosystem: str = "np
         import re
         if not re.match(r"^[<>=^\~]", target_version):
             target_version = f"=={target_version}"
-            
+
         code, out, err = _run(["uv", "add", f"{package}{target_version}"])
         if code != 0:
             return f"Failed to bump python package {package} using uv: {err}"
-            
+
         return f"Bumped Python package {package} to {target_version} using uv add."
-        
+
     return f"Unsupported ecosystem: {ecosystem}"
 
 
@@ -271,7 +271,7 @@ def commit_changes(message: str | None = None) -> str:
     existing_files = [f for f in files_to_add if (_WORKSPACE / f).exists()]
     if existing_files:
         _run(["git", "add"] + existing_files)
-        
+
     code, out, err = _run(["git", "diff", "--staged", "--quiet"])
     if code != 0:
         # Changes are staged, now commit
@@ -318,9 +318,9 @@ def get_commit_messages(base_branch: str, head_branch: str) -> list[str]:
         code, out, err = _run(["git", "log", f"origin/{base_branch}..{head_branch}", "--format=%B"])
         if code != 0:
             return []
-    
+
     # Split by empty line separating commits, or just split by some delimiter
-    # Actually --format=%B just prints the raw body. 
+    # Actually --format=%B just prints the raw body.
     # To get individual messages reliably, we can use a custom delimiter.
     code, out, err = _run(["git", "log", f"{base_branch}..{head_branch}", "--format=%B%n---END_COMMIT---"])
     if code != 0:

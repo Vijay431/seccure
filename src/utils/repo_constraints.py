@@ -24,8 +24,8 @@ def read_repo_constraints() -> str:
         Combined constraints text, or empty string if no constraints found.
     """
     import base64
-    from httpx import HTTPStatusError
-    from agent.tools.github_client import get
+
+    from src.utils.gh_wrapper_v2 import run_gh_command
 
     parts: list[str] = []
 
@@ -41,11 +41,11 @@ def read_repo_constraints() -> str:
         repo = os.environ.get("TARGET_REPO") or os.environ.get("GITHUB_REPOSITORY", "")
         if repo:
             try:
-                resp = get(f"/repos/{repo}/contents/.seccure/constraints.md")
+                resp = run_gh_command(["api", f"/repos/{repo}/contents/.seccure/constraints.md"])
                 if isinstance(resp, dict) and resp.get("type") == "file" and "content" in resp:
                     content = base64.b64decode(resp["content"]).decode("utf-8").strip()
-            except HTTPStatusError as e:
-                if e.response.status_code != 404:
+            except RuntimeError as e:
+                if "404" not in str(e) and "Not Found" not in str(e):
                     print(f"[Seccure] Warning: failed to fetch constraints.md from API: {e}")
 
     if content:

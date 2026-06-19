@@ -7,10 +7,10 @@ repo-specific constraints can be injected at runtime.
 
 from __future__ import annotations
 
-from agent.resilient_runner import ResilientOpenRouterAgent as OpenRouterAgent
-from agent.state import read_state, write_state_section
-from agent.subagents.audit_fanout import run_audit_fanout
-from agent.tools.git_tools import (
+from src.lib.resilient_runner import ResilientOpenRouterAgent as OpenRouterAgent
+from src.lib.state import read_state, write_state_section
+from src.pipelines.subagents.audit_fanout import run_audit_fanout
+from src.utils.git_tools import (
     apply_package_override,
     bump_package_version,
     check_remaining_vulnerabilities,
@@ -18,15 +18,15 @@ from agent.tools.git_tools import (
     ensure_lockfile,
     run_auto_fix,
 )
-from agent.tools.github_pulls import fetch_ci_logs_for_pr
-from agent.tools.github_pulls import (
+from src.utils.github_issues import create_conflict_issue
+from src.utils.github_pulls import (
     check_existing_seccure_pr,
     close_seccure_pr,
+    fetch_ci_logs_for_pr,
     get_default_branch,
 )
-from agent.tools.github_issues import create_conflict_issue
-from agent.tools.observability import log_token_usage
-from agent.tools.repo_constraints import read_repo_constraints
+from src.utils.observability import log_token_usage
+from src.utils.repo_constraints import read_repo_constraints
 
 
 def build_coordinator(system_prompt: str) -> OpenRouterAgent:
@@ -77,7 +77,7 @@ def build_coordinator(system_prompt: str) -> OpenRouterAgent:
 
     async def invoke_subagent(TypeName: str, Role: str, Prompt: str) -> str:
         if TypeName == "PRAgent":
-            from agent.subagents.pr_agent import build_pr_agent
+            from src.pipelines.subagents.pr_agent import build_pr_agent
             agent = build_pr_agent()
         else:
             return (

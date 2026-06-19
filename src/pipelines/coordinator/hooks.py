@@ -9,7 +9,7 @@ import httpx
 from google.antigravity.hooks import hooks
 from google.antigravity.hooks.hooks import HookContext, HookResult
 
-from agent.config import RunLimits
+from src.config.config import RunLimits
 
 
 class MaxIterationsHook(hooks.PreToolCallDecideHook):

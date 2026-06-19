@@ -1,7 +1,9 @@
 import asyncio
 import logging
-from openai import RateLimitError, APIConnectionError, InternalServerError
-from agent.openrouter_runner import OpenRouterAgent, OpenRouterResponse
+
+from openai import APIConnectionError, InternalServerError, RateLimitError
+
+from src.lib.openrouter_runner import OpenRouterAgent, OpenRouterResponse
 
 logger = logging.getLogger(__name__)
 

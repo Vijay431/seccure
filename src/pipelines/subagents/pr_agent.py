@@ -6,14 +6,11 @@ push the branch, and open or update a consolidated pull request.
 
 from __future__ import annotations
 
-from agent.config import RunLimits
-from agent.resilient_runner import ResilientOpenRouterAgent as OpenRouterAgent
-from agent.state import read_state, write_state_section
-from agent.tools.git_tools import commit_changes, create_fix_branch, push_branch
-from agent.tools.github_pulls import (
-    check_existing_seccure_pr,
-    close_seccure_pr,
-    get_default_branch,
+from src.config.config import RunLimits
+from src.lib.resilient_runner import ResilientOpenRouterAgent as OpenRouterAgent
+from src.lib.state import read_state, write_state_section
+from src.utils.git_tools import commit_changes, create_fix_branch, push_branch
+from src.utils.github_pulls import (
     upsert_seccure_pr,
 )
 

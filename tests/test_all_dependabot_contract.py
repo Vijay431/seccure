@@ -3,8 +3,14 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
+from src.utils.github_pulls import (
+    ATTEMPT_MARKER,
+    extract_attempt_count,
+    render_pr_title_body,
+    with_attempt_marker,
+)
 
-from agent.config import (
+from src.config.config import (
     CodeScanningFinding,
     DependencyFinding,
     FixResult,
@@ -12,26 +18,20 @@ from agent.config import (
     SeccureState,
     ToolResult,
 )
-from agent.coordinator.agent import build_coordinator
-from agent.coordinator.runtime import should_exit_for_tool_result
-from agent.fixers.registry import route_finding
-from agent.openrouter_runner import OpenRouterAgent
-from agent.subagents.audit_fanout import (
+from src.lib.openrouter_runner import OpenRouterAgent
+from src.pipelines.coordinator.agent import build_coordinator
+from src.pipelines.coordinator.runtime import should_exit_for_tool_result
+from src.pipelines.fixers.registry import route_finding
+from src.pipelines.subagents.audit_fanout import (
     enrich_dependabot_pr,
     infer_ecosystem_from_files,
     run_audit_fanout,
 )
-from agent.subagents.audit_issue_agent import build_audit_issue_agent
-from agent.subagents.audit_pr_agent import build_audit_pr_agent
-from agent.subagents.audit_security_agent import build_audit_security_agent
-from agent.subagents.pr_agent import build_pr_agent
-from agent.tools.events import redact_text
-from agent.tools.github_write import (
-    ATTEMPT_MARKER,
-    extract_attempt_count,
-    render_pr_title_body,
-    with_attempt_marker,
-)
+from src.pipelines.subagents.audit_issue_agent import build_audit_issue_agent
+from src.pipelines.subagents.audit_pr_agent import build_audit_pr_agent
+from src.pipelines.subagents.audit_security_agent import build_audit_security_agent
+from src.pipelines.subagents.pr_agent import build_pr_agent
+from src.utils.events import redact_text
 
 
 def test_dependency_and_code_scanning_findings_are_separate() -> None:

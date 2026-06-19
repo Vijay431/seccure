@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 WORKFLOW = Path(".github/workflows/github-agentic-seccure.md")
 
 

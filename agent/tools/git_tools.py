@@ -300,3 +300,33 @@ def push_branch(branch_name: str, repo: str) -> str:
     if code != 0:
         return f"Push failed: {err}"
     return f"Pushed branch '{branch_name}' to {repo}."
+
+def get_commit_messages(base_branch: str, head_branch: str) -> list[str]:
+    """
+    Retrieves commit messages between the base_branch and head_branch locally.
+    
+    Args:
+        base_branch (str): The branch being merged into (e.g., 'main')
+        head_branch (str): The feature branch with new commits
+        
+    Returns:
+        list[str]: A list of commit messages.
+    """
+    code, out, err = _run(["git", "log", f"{base_branch}..{head_branch}", "--format=%B"])
+    if code != 0:
+        # Fallback if base_branch is not available locally, maybe try origin/base_branch
+        code, out, err = _run(["git", "log", f"origin/{base_branch}..{head_branch}", "--format=%B"])
+        if code != 0:
+            return []
+    
+    # Split by empty line separating commits, or just split by some delimiter
+    # Actually --format=%B just prints the raw body. 
+    # To get individual messages reliably, we can use a custom delimiter.
+    code, out, err = _run(["git", "log", f"{base_branch}..{head_branch}", "--format=%B%n---END_COMMIT---"])
+    if code != 0:
+        code, out, err = _run(["git", "log", f"origin/{base_branch}..{head_branch}", "--format=%B%n---END_COMMIT---"])
+        if code != 0:
+            return []
+
+    messages = out.split("---END_COMMIT---")
+    return [m.strip() for m in messages if m.strip()]

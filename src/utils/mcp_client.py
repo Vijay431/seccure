@@ -56,6 +56,8 @@ class RobustMCPManager:
                     "-e",
                     "GITHUB_HOST",
                     "ghcr.io/github/github-mcp-server",
+                    "stdio",
+                    "--toolsets=all"
                 ],
                 "transport": "stdio",
                 "env": {
@@ -122,6 +124,10 @@ class RobustMCPManager:
 
             sys.exit(1)
 
+        async with self._lock:
+            if not self.client or not self._tools_cache:
+                await self.start_server()
+
         attempts = 0
         while attempts <= self.retry_limit:
             try:
@@ -129,7 +135,22 @@ class RobustMCPManager:
                 if not actual_tool:
                     raise ValueError(f"Tool {tool_name} not found in MCP server")
 
-                return await actual_tool.ainvoke(kwargs_dict)
+                res = await actual_tool.ainvoke(kwargs_dict)
+                
+                # Check for rate limits returning as text instead of exceptions
+                if res and isinstance(res, list) and "text" in res[0]:
+                    text_out = res[0]["text"]
+                    if isinstance(text_out, str) and "You have exceeded a secondary rate limit" in text_out:
+                        import re
+                        m = re.search(r"\[retry after (\d+)s\]", text_out)
+                        wait_time = int(m.group(1)) if m else 30
+                        logger.warning(f"Rate limited by GitHub API. Waiting {wait_time}s before retrying...")
+                        await asyncio.sleep(wait_time + 1)
+                        # Don't restart server, just retry
+                        attempts += 1
+                        continue
+
+                return res
             except Exception as e:
                 attempts += 1
                 logger.warning(
@@ -142,6 +163,7 @@ class RobustMCPManager:
                     raise
 
                 await self.restart_server()
+
 
 
 _global_mcp_manager = None

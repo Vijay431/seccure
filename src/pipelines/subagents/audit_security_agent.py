@@ -6,6 +6,8 @@ Writes a validated AlertSummary to shared state.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from src.config.config import AlertSummary, RunLimits
 from src.lib.resilient_runner import ResilientOpenRouterAgent as OpenRouterAgent
 from src.lib.state import read_state, write_state_section
@@ -25,14 +27,15 @@ You MUST follow these steps exactly:
 """
 
 
-def build_audit_security_agent() -> OpenRouterAgent:
+def build_audit_security_agent(tools: list[Callable] | None = None) -> OpenRouterAgent:
     """Build and return the AuditSecurityAgent instance."""
-    tools = [
-        list_dependabot_alerts,
-        list_code_scanning_alerts,
-        read_state,
-        write_state_section,
-    ]
+    if tools is None:
+        tools = [
+            list_dependabot_alerts,
+            list_code_scanning_alerts,
+            read_state,
+            write_state_section,
+        ]
 
     return OpenRouterAgent(
         system_instructions=_PROMPT,

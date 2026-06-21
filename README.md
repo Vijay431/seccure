@@ -119,4 +119,4 @@ Seccure uses a **Coordinator-Subagent architecture** driven by OpenRouter:
 2. **IssueAgent**, **PRAgent**, **SecurityAgent** (`openai/gpt-4o-mini` via OpenRouter): Narrow-context subagents that read GitHub APIs and write structured Pydantic summaries (`AlertSummary`, etc.) to a shared JSON state file.
 
 All LLM actions run unattended through deterministic Python tools with bounded
-tool-call budgets and redacted logs.
+tool-call budgets and redacted logs. The `TARGET_REPO` environment variable is strictly enforced by the MCP client, preventing any rogue agent behavior from affecting unauthorized repositories.

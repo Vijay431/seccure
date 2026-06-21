@@ -3,8 +3,6 @@ import os
 import subprocess
 from datetime import date
 
-from google.antigravity import ToolContext
-
 from src.utils.mcp_client import get_mcp_manager
 
 
@@ -39,14 +37,17 @@ def _get_owner_repo() -> tuple[str, str]:
     )
 
 
-async def list_security_issues(ctx: ToolContext) -> str:
+_security_issues_cache = None
+
+
+async def list_security_issues() -> str:
     """Fetch all open GitHub issues labelled 'security' or 'dependabot'.
     Excludes pull requests. Deduplicates by issue number.
     Uses ToolContext caching to avoid duplicate API calls within one turn.
     """
-    cached = ctx.get_state("raw_security_issues")
-    if cached:
-        return cached
+    global _security_issues_cache
+    if _security_issues_cache is not None:
+        return _security_issues_cache
 
     owner, repo = _get_owner_repo()
     manager = get_mcp_manager()
@@ -88,7 +89,6 @@ async def list_security_issues(ctx: ToolContext) -> str:
 
             msg = f"[Seccure] Warning: Security issues for label '{label}' truncated to 30 items."
             print(msg, file=sys.stderr)
-            ctx.set_state(f"issues_warning_{label}", msg)
 
         for issue in items:
             num = issue.get("number")
@@ -116,7 +116,7 @@ async def list_security_issues(ctx: ToolContext) -> str:
             )
 
     payload = json.dumps(results)
-    ctx.set_state("raw_security_issues", payload)
+    _security_issues_cache = payload
     return payload
 
 

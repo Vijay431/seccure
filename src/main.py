@@ -68,6 +68,43 @@ issue with the reason: "blocked by repo constraint: <quote the relevant rule>".
 """
 
 
+def _verify_github_access(repo: str, token: str) -> None:
+    """Verify that the GitHub token has access to the target repository."""
+    import urllib.error
+    import urllib.request
+
+    if not token:
+        print("[Seccure] ❌ FATAL: GITHUB_TOKEN environment variable is missing.")
+        sys.exit(1)
+
+    url = f"https://api.github.com/repos/{repo}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "Seccure-Agent",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            if response.status != 200:
+                print(
+                    f"[Seccure] ❌ FATAL: Failed to access repo {repo}. Status: {response.status}"
+                )
+                sys.exit(1)
+    except urllib.error.HTTPError as e:
+        print(
+            f"[Seccure] ❌ FATAL: Permission error accessing {repo}: {e.code} {e.reason}"
+        )
+        print("Ensure GITHUB_TOKEN has read/write access to TARGET_REPO.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[Seccure] ❌ FATAL: Unexpected error verifying repo access: {e}")
+        sys.exit(1)
+
+
 def _trace_if_enabled(func):
     import os
 
@@ -92,6 +129,10 @@ async def main() -> None:
 
     print(f"[Seccure] Starting run {run_id} for repo: {repo} (ecosystem: {ecosystem})")
     print(f"[Seccure] Fix branch: {fix_branch}")
+
+    # 0. Proactive permission verification
+    github_token = os.environ.get("GITHUB_TOKEN", "")
+    _verify_github_access(repo, github_token)
 
     # 1. Load repo-specific constraints (may be empty string)
     constraints = await load_constraints_text()

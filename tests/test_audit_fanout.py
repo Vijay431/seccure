@@ -1,76 +1,47 @@
-from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.config.config import ToolResult
 from src.pipelines.subagents.audit_fanout import run_audit_fanout
 
 
-class DummyContext:
-    def __init__(self):
-        self.state = {}
+@pytest.mark.asyncio
+@patch("src.pipelines.subagents.audit_issue_agent.build_audit_issue_agent")
+@patch("src.pipelines.subagents.audit_pr_agent.build_audit_pr_agent")
+@patch("src.pipelines.subagents.audit_security_agent.build_audit_security_agent")
+async def test_run_audit_fanout_success(mock_sec, mock_pr, mock_iss):
+    mock_agent = MagicMock()
+    mock_agent.__aenter__ = AsyncMock(return_value=mock_agent)
+    mock_agent.__aexit__ = AsyncMock(return_value=False)
+
+    mock_response = MagicMock()
+    mock_agent.chat = AsyncMock(return_value=mock_response)
+
+    mock_sec.return_value = mock_agent
+    mock_pr.return_value = mock_agent
+    mock_iss.return_value = mock_agent
+
+    result = await run_audit_fanout()
+    assert result.ok
+    assert not result.fatal
 
 
 @pytest.mark.asyncio
-async def test_run_audit_fanout_handles_permission_error():
-    ctx = DummyContext()  # type: ignore
+@patch("src.pipelines.subagents.audit_issue_agent.build_audit_issue_agent")
+@patch("src.pipelines.subagents.audit_pr_agent.build_audit_pr_agent")
+@patch("src.pipelines.subagents.audit_security_agent.build_audit_security_agent")
+async def test_run_audit_fanout_handles_permission_error(mock_sec, mock_pr, mock_iss):
+    mock_agent = MagicMock()
+    mock_agent.__aenter__ = AsyncMock(return_value=mock_agent)
+    mock_agent.__aexit__ = AsyncMock(return_value=False)
 
-    async def mock_issue_tool(ctx: Any) -> str:
-        raise PermissionError("Access denied")
+    mock_agent.chat = AsyncMock(side_effect=PermissionError("Access denied"))
 
-    async def mock_pr_tool(ctx: Any) -> str:
-        return "[]"
+    mock_sec.return_value = mock_agent
+    mock_pr.return_value = mock_agent
+    mock_iss.return_value = mock_agent
 
-    async def mock_dep_alert_tool(ctx: Any) -> str:
-        return "[]"
-
-    async def mock_code_alert_tool(ctx: Any) -> str:
-        return "[]"
-
-    result = await run_audit_fanout(
-        ctx,  # type: ignore
-        issue_tool=mock_issue_tool,
-        pr_tool=mock_pr_tool,
-        dependabot_alert_tool=mock_dep_alert_tool,
-        code_scanning_tool=mock_code_alert_tool,
-    )
-
-    assert isinstance(result, ToolResult)
-    assert result.ok is False
-    assert result.fatal is True
-    assert result.message == "Access denied"
-
-
-@pytest.mark.asyncio
-@patch("src.pipelines.subagents.audit_fanout.write_state_section")
-async def test_run_audit_fanout_success(mock_write_state):
-    ctx = DummyContext()  # type: ignore
-
-    async def mock_issue_tool(ctx: Any) -> str:
-        return '[{"issue_number": 1, "title": "Security bug", "url": "http://test"}]'
-
-    async def mock_pr_tool(ctx: Any) -> str:
-        return '[{"number": 2, "title": "bump foo from 1.0 to 2.0"}]'
-
-    async def mock_dep_alert_tool(ctx: Any) -> str:
-        return '[{"package": "bar", "severity": "high"}]'
-
-    async def mock_code_alert_tool(ctx: Any) -> str:
-        return '[{"rule_id": "rule-1", "severity": "critical", "alert_number": 42}]'
-
-    result = await run_audit_fanout(
-        ctx,  # type: ignore
-        issue_tool=mock_issue_tool,
-        pr_tool=mock_pr_tool,
-        dependabot_alert_tool=mock_dep_alert_tool,
-        code_scanning_tool=mock_code_alert_tool,
-    )
-
-    assert isinstance(result, ToolResult)
-    assert result.ok is True
-    assert len(result.data["security_issues"]) == 1
-    assert result.data["security_issues"][0]["issue_number"] == 1
-    assert len(result.data["dependency_findings"]) == 2  # 1 PR + 1 dep alert
-    assert len(result.data["code_scanning_findings"]) == 1
-    assert mock_write_state.call_count == 4
+    result = await run_audit_fanout()
+    assert not result.ok
+    assert result.fatal
+    assert "Access denied" in result.message

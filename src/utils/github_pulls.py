@@ -3,18 +3,18 @@ import re
 import subprocess
 import sys
 
-from google.antigravity import ToolContext
-
 from src.config.config import SeccureState
 from src.utils.git_tools import get_commit_messages
 from src.utils.mcp_client import get_mcp_manager
 
+_dependabot_prs_cache = None
 
-async def list_dependabot_prs(ctx: ToolContext) -> str:
+
+async def list_dependabot_prs() -> str:
     """Fetch all open pull requests authored by dependabot[bot]."""
-    cached = ctx.get_state("raw_dependabot_prs")
-    if cached:
-        return cached
+    global _dependabot_prs_cache
+    if _dependabot_prs_cache is not None:
+        return _dependabot_prs_cache
 
     owner, repo = _get_owner_repo()
     manager = get_mcp_manager()
@@ -46,7 +46,6 @@ async def list_dependabot_prs(ctx: ToolContext) -> str:
         if len(items) == 30:
             msg = "[Seccure] Warning: Dependabot PRs truncated to 30 items."
             print(msg, file=sys.stderr)
-            ctx.set_state("dependabot_prs_warning", msg)
 
         for pr in items:
             title = pr.get("title", "")
@@ -63,7 +62,7 @@ async def list_dependabot_prs(ctx: ToolContext) -> str:
             )
 
     payload = json.dumps(results)
-    ctx.set_state("raw_dependabot_prs", payload)
+    _dependabot_prs_cache = payload
     return payload
 
 

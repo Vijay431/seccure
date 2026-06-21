@@ -6,6 +6,8 @@ push the branch, and open or update a consolidated pull request.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from src.config.config import RunLimits
 from src.lib.resilient_runner import ResilientOpenRouterAgent as OpenRouterAgent
 from src.lib.state import read_state, write_state_section
@@ -32,16 +34,17 @@ marker, and Closes references are rendered by deterministic Python code.
 """
 
 
-def build_pr_agent() -> OpenRouterAgent:
+def build_pr_agent(tools: list[Callable] | None = None) -> OpenRouterAgent:
     """Build and return the PRAgent instance for post-fix operations."""
-    tools = [
-        read_state,
-        write_state_section,
-        create_fix_branch,
-        commit_changes,
-        push_branch,
-        upsert_seccure_pr,
-    ]
+    if tools is None:
+        tools = [
+            read_state,
+            write_state_section,
+            create_fix_branch,
+            commit_changes,
+            push_branch,
+            upsert_seccure_pr,
+        ]
 
     return OpenRouterAgent(
         system_instructions=_PROMPT,

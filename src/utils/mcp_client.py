@@ -30,6 +30,12 @@ class RobustMCPManager:
         self._tools_cache: dict[str, Any] = {}
         self._lock = asyncio.Lock()
 
+        self.target_repo = os.environ.get("TARGET_REPO")
+        if not self.target_repo:
+            raise ValueError(
+                "TARGET_REPO environment variable is not set. Cannot initialize MCP client."
+            )
+
     async def __aenter__(self):
         await self.start_server()
         return self
@@ -95,6 +101,27 @@ class RobustMCPManager:
             return wrapped_tools
 
     async def call_tool_with_retry(self, tool_name: str, kwargs_dict: dict):
+        # US2: Intercept requests to other repos
+        repo_arg = kwargs_dict.get("repo")
+        owner_arg = kwargs_dict.get("owner")
+
+        repo_to_check = None
+        if repo_arg and "/" in repo_arg:
+            repo_to_check = repo_arg
+        elif owner_arg and repo_arg:
+            repo_to_check = f"{owner_arg}/{repo_arg}"
+
+        if (
+            repo_to_check
+            and self.target_repo
+            and repo_to_check.lower() != self.target_repo.lower()
+        ):
+            msg = f"Access to repo {repo_to_check} is forbidden. Only TARGET_REPO {self.target_repo} is allowed."
+            logger.error(msg)
+            import sys
+
+            sys.exit(1)
+
         attempts = 0
         while attempts <= self.retry_limit:
             try:

@@ -33,9 +33,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python >= 3.12: Follow standard conventions
 
 ## Recent Changes
+- 001-restrict-subagent-permissions: Added Python 3.12 + LangChain, Pydantic
 - 001-github-mcp-server: Added Python 3.12 + LangChain, `langchain-mcp-adapters`, `mcp`
 - 001-github-mcp-server: Added Python 3.12 + LangChain, `langchain-mcp-adapters`, `mcp`
-- 001-update-subagents: Added Python 3.12 + LangChain, Pydantic
 
 
 <!-- MANUAL ADDITIONS START -->

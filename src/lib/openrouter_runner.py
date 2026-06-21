@@ -38,7 +38,7 @@ class OpenRouterAgent:
         )
         self.client = AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1",
-            api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+            api_key=os.environ.get("OPENROUTER_API_KEY", "dummy_key"),
         )
         if tools:
             system_instructions += (

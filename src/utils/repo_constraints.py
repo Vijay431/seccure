@@ -1,35 +1,13 @@
-"""Tool to read repo-specific constraints from .seccure/constraints.md.
-
-Constraints are optional free-text rules that repo maintainers write to
-control how Seccure fixes vulnerabilities (e.g. 'do not upgrade TypeScript
-to a major version').
-"""
-
-from __future__ import annotations
-
 import os
 from pathlib import Path
 
+from src.utils.mcp_client import get_mcp_manager
 
-def read_repo_constraints() -> str:
-    """Read the repo-specific constraints file and the ADDITIONAL_CONSTRAINTS env var.
 
-    Fetches .seccure/constraints.md from the target repository via the GitHub API,
-    or reads it locally if SECCURE_CONSTRAINTS_DIR is set.
-
-    Merges file-based constraints with any one-off constraints passed via
-    the ADDITIONAL_CONSTRAINTS env var (workflow_dispatch input).
-
-    Returns:
-        Combined constraints text, or empty string if no constraints found.
-    """
-    import base64
-
-    from src.utils.gh_wrapper_v2 import run_gh_command
-
+async def read_repo_constraints() -> str:
+    """Read the repo-specific constraints file and the ADDITIONAL_CONSTRAINTS env var."""
     parts: list[str] = []
 
-    # 1. File-based constraints (.seccure/constraints.md)
     constraints_dir = os.environ.get("SECCURE_CONSTRAINTS_DIR", "")
     content = ""
     if constraints_dir:
@@ -37,21 +15,34 @@ def read_repo_constraints() -> str:
         if constraints_file.exists():
             content = constraints_file.read_text().strip()
     else:
-        # Fetch from GitHub API
-        repo = os.environ.get("TARGET_REPO") or os.environ.get("GITHUB_REPOSITORY", "")
-        if repo:
+        repo_env = os.environ.get("TARGET_REPO") or os.environ.get(
+            "GITHUB_REPOSITORY", ""
+        )
+        if repo_env and "/" in repo_env:
+            owner, repo = repo_env.split("/", 1)
+            manager = get_mcp_manager()
             try:
-                resp = run_gh_command(["api", f"/repos/{repo}/contents/.seccure/constraints.md"])
-                if isinstance(resp, dict) and resp.get("type") == "file" and "content" in resp:
-                    content = base64.b64decode(resp["content"]).decode("utf-8").strip()
-            except RuntimeError as e:
-                if "404" not in str(e) and "Not Found" not in str(e):
-                    print(f"[Seccure] Warning: failed to fetch constraints.md from API: {e}")
+                res = await manager.call_tool_with_retry(
+                    "get_file_contents",
+                    {"owner": owner, "repo": repo, "path": ".seccure/constraints.md"},
+                )
+                # get_file_contents returns decoded content in the text field or we might need to parse json
+                # The MCP server usually returns file content directly in text.
+                if res and isinstance(res, list) and "text" in res[0]:
+                    text_out = res[0]["text"]
+                    if not text_out.startswith("failed to "):
+                        content = text_out.strip()
+            except Exception as e:
+                import sys
+
+                print(
+                    f"[Seccure] Warning: failed to fetch constraints.md from API: {e}",
+                    file=sys.stderr,
+                )
 
     if content:
         parts.append(f"## From .seccure/constraints.md\n\n{content}")
 
-    # 2. One-off constraints from workflow_dispatch input
     extra = os.environ.get("ADDITIONAL_CONSTRAINTS", "").strip()
     if extra:
         parts.append(f"## Additional constraints (this run only)\n\n{extra}")
@@ -59,6 +50,6 @@ def read_repo_constraints() -> str:
     return "\n\n".join(parts)
 
 
-def load_constraints_text() -> str:
+async def load_constraints_text() -> str:
     """Non-tool version of read_repo_constraints() for use in main.py."""
-    return read_repo_constraints()
+    return await read_repo_constraints()

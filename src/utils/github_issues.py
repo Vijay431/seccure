@@ -1,12 +1,45 @@
 import json
+import os
+import subprocess
 from datetime import date
 
 from google.antigravity import ToolContext
 
-from src.utils.gh_wrapper_v2 import run_gh_command
+from src.utils.mcp_client import get_mcp_manager
 
 
-def list_security_issues(ctx: ToolContext) -> str:
+def _get_owner_repo() -> tuple[str, str]:
+    repo_env = os.environ.get("TARGET_REPO") or os.environ.get("GITHUB_REPOSITORY")
+    if repo_env:
+        parts = repo_env.split("/")
+        if len(parts) == 2:
+            return parts[0], parts[1]
+
+    # Fallback
+    try:
+        res = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        url = res.stdout.strip()
+        # e.g., https://github.com/owner/repo.git or git@github.com:owner/repo.git
+        if url.startswith("https://github.com/") or url.startswith("git@github.com:"):
+            path = url.split("github.com")[-1].lstrip(":/")
+            path = path.removesuffix(".git")
+            parts = path.split("/")
+            if len(parts) == 2:
+                return parts[0], parts[1]
+    except Exception:
+        pass
+
+    raise ValueError(
+        "Could not determine repository owner and name from environment or git remote."
+    )
+
+
+async def list_security_issues(ctx: ToolContext) -> str:
     """Fetch all open GitHub issues labelled 'security' or 'dependabot'.
     Excludes pull requests. Deduplicates by issue number.
     Uses ToolContext caching to avoid duplicate API calls within one turn.
@@ -15,43 +48,79 @@ def list_security_issues(ctx: ToolContext) -> str:
     if cached:
         return cached
 
+    owner, repo = _get_owner_repo()
+    manager = get_mcp_manager()
     results = []
     seen = set()
 
     for label in ("security", "dependabot"):
-        data = run_gh_command([
-            "issue", "list",
-            "--label", label,
-            "--state", "open",
-            "--limit", "30",
-            "--json", "number,title,labels,url"
-        ])
-        if not data:
+        query = f"repo:{owner}/{repo} is:issue state:open label:{label}"
+        try:
+            data = await manager.call_tool_with_retry(
+                "search_issues", {"query": query, "perPage": 30}
+            )
+        except Exception as e:
+            # If tool fails, just continue
+            import sys
+
+            print(f"[Seccure] Warning: search_issues tool failed: {e}", file=sys.stderr)
             continue
 
-        if len(data) == 30:
+        if not data or not isinstance(data, list) or "text" not in data[0]:
+            continue
+
+        items_text = data[0]["text"]
+
+        # If it returned an error string instead of JSON
+        if items_text.startswith("failed to "):
             import sys
+
+            print(f"[Seccure] search_issues error: {items_text}", file=sys.stderr)
+            continue
+
+        try:
+            items = json.loads(items_text)
+        except json.JSONDecodeError:
+            continue
+
+        if len(items) == 30:
+            import sys
+
             msg = f"[Seccure] Warning: Security issues for label '{label}' truncated to 30 items."
             print(msg, file=sys.stderr)
             ctx.set_state(f"issues_warning_{label}", msg)
 
-        for issue in data:
-            num = issue["number"]
-            if num in seen:
+        for issue in items:
+            num = issue.get("number")
+            if not num or num in seen:
                 continue
             seen.add(num)
-            results.append({
-                "number": num,
-                "title": issue["title"],
-                "labels": [lb["name"] for lb in issue.get("labels", [])],
-                "html_url": issue.get("url") or issue.get("html_url", "")
-            })
+
+            # search_issues might return limited fields, ensure we get title/labels/url
+            # Sometimes labels might not be included in search results, so we do our best.
+            labels = issue.get("labels", [])
+            if (
+                isinstance(labels, list)
+                and len(labels) > 0
+                and isinstance(labels[0], dict)
+            ):
+                labels = [lb.get("name") for lb in labels]
+
+            results.append(
+                {
+                    "number": num,
+                    "title": issue.get("title", ""),
+                    "labels": labels,
+                    "html_url": issue.get("url") or issue.get("html_url", ""),
+                }
+            )
 
     payload = json.dumps(results)
     ctx.set_state("raw_security_issues", payload)
     return payload
 
-def create_conflict_issue(
+
+async def create_conflict_issue(
     package: str,
     cve_id: str,
     severity: str,
@@ -79,18 +148,34 @@ Seccure Agent attempted all fix strategies and failed.
 ---
 > Created by Seccure Agent on {today}.
 """
-    # Create issue with gh
-    data = run_gh_command([
-        "issue", "create",
-        "--title", f"🚨 Unresolved vulnerability: {package} ({cve_id})",
-        "--body", body,
-        "--label", "security,conflict,seccure"
-    ])
-    # gh issue create doesn't support --json. It outputs the URL.
-    # We can fetch the issue number from the URL or just fetch the latest issue.
-    # It outputs just the URL to stdout if not tty, let's extract the number.
+    owner, repo = _get_owner_repo()
+    manager = get_mcp_manager()
 
-    # Actually we can do gh issue view <url> --json number,url
-    url = data.strip()
-    issue_data = run_gh_command(["issue", "view", url, "--json", "number,url"])
-    return json.dumps({"issue_number": issue_data["number"], "url": issue_data["url"]})
+    title = f"🚨 Unresolved vulnerability: {package} ({cve_id})"
+
+    res = await manager.call_tool_with_retry(
+        "issue_write",
+        {
+            "method": "create",
+            "owner": owner,
+            "repo": repo,
+            "title": title,
+            "body": body,
+            "labels": ["security", "conflict", "seccure"],
+        },
+    )
+
+    # Extract output URL and issue number
+    if res and isinstance(res, list) and "text" in res[0]:
+        output_text = res[0]["text"]
+        try:
+            issue_data = json.loads(output_text)
+            return json.dumps(
+                {
+                    "issue_number": issue_data.get("number"),
+                    "url": issue_data.get("html_url") or issue_data.get("url"),
+                }
+            )
+        except json.JSONDecodeError:
+            return json.dumps({"issue_number": 0, "url": output_text})
+    return json.dumps({"issue_number": 0, "url": str(res)})

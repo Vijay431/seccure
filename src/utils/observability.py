@@ -46,17 +46,24 @@ def log_token_usage(usage_map: dict[str, Any], extra_summary: str = "") -> str:
     constraints_note = ""
     if constraints_dir:
         from pathlib import Path
+
         cf = Path(constraints_dir) / "constraints.md"
         if cf.exists():
-            constraints_note = "\n**Constraints active:** Yes — `.seccure/constraints.md`"
+            constraints_note = (
+                "\n**Constraints active:** Yes — `.seccure/constraints.md`"
+            )
 
-    markdown = f"""## 🛡️ Seccure Run Summary — {today}
+    markdown = (
+        f"""## 🛡️ Seccure Run Summary — {today}
 {constraints_note}
 
 ### Token Usage
 | Agent | Prompt Tokens | Output Tokens | Thinking Tokens | Total |
 |-------|-------------|--------------|----------------|-------|
-""" + "\n".join(rows) + "\n"
+"""
+        + "\n".join(rows)
+        + "\n"
+    )
 
     if extra_summary:
         markdown += f"\n{extra_summary}\n"

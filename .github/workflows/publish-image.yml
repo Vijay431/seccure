@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'agent/**'
+      - 'src/**'
       - 'Dockerfile'
       - 'requirements.txt'
   release:

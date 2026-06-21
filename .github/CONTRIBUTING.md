@@ -8,7 +8,7 @@ This guide will help you understand the internal architecture of Seccure, how to
 
 ## 🏗 Architecture Overview
 
-Seccure is not a traditional procedural script. It is an autonomous, goal-oriented system powered by the **Google Agent Development Kit (ADK)**. 
+Seccure is not a traditional procedural script. It is an autonomous, goal-oriented system powered by **LangChain via OpenRouter**. 
 
 To manage complexity, avoid context-window bloat, and prevent LLM hallucinations, Seccure uses a **Coordinator-Subagent architecture**.
 

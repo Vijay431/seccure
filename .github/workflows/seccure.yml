@@ -30,6 +30,7 @@ jobs:
     container:
       # Replace 'owner' with the actual repository owner where the image is hosted
       image: ghcr.io/owner/seccure:latest
+      options: --user root -v /var/run/docker.sock:/var/run/docker.sock
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GITHUB_TOKEN: ${{ github.token }}
@@ -46,7 +47,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Run Seccure Agent
-        run: python /app/agent/main.py
+        run: python /app/src/main.py
         env:
           SECCURE_CONSTRAINTS_DIR: ${{ github.workspace }}/target_repo/.seccure
 

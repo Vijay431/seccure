@@ -18,8 +18,10 @@ You MUST follow these steps exactly:
 2. STOP and wait for the tools' output. Do NOT hallucinate data.
 3. Once you receive the output, combine the lists.
 4. CALL `write_state_section()` tool with section="alerts" and the extracted data.
-5. Output the EXACT SAME JSON:
-   {"items": [...], "count": N, "critical_count": X, "high_count": Y}
+5. Output the EXACT SAME JSON structure with the addition of:
+   - "summarization": A brief summary of the alerts found. If no alerts, state "No security alerts found".
+   - "action_required": A boolean (true if there are alerts needing fixes, false otherwise).
+   Example: {"items": [...], "count": N, "critical_count": X, "high_count": Y, "summarization": "...", "action_required": true/false}
 """
 
 

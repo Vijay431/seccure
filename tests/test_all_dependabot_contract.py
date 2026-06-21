@@ -3,12 +3,6 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
-from src.utils.github_pulls import (
-    ATTEMPT_MARKER,
-    extract_attempt_count,
-    render_pr_title_body,
-    with_attempt_marker,
-)
 
 from src.config.config import (
     CodeScanningFinding,
@@ -32,6 +26,12 @@ from src.pipelines.subagents.audit_pr_agent import build_audit_pr_agent
 from src.pipelines.subagents.audit_security_agent import build_audit_security_agent
 from src.pipelines.subagents.pr_agent import build_pr_agent
 from src.utils.events import redact_text
+from src.utils.github_pulls import (
+    ATTEMPT_MARKER,
+    extract_attempt_count,
+    render_pr_title_body,
+    with_attempt_marker,
+)
 
 
 def test_dependency_and_code_scanning_findings_are_separate() -> None:

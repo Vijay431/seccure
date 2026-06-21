@@ -19,7 +19,10 @@ You MUST follow these steps exactly:
 3. Once you receive the tool output, extract the data.
 4. CALL `write_state_section()` tool with section="dependabot_prs" and
    the extracted data.
-5. Output the EXACT SAME JSON: {"items": [...], "count": N}
+5. Output the EXACT SAME JSON structure with the addition of:
+   - "summarization": A brief summary of the PRs found. If no PRs, state "No open Dependabot PRs found".
+   - "action_required": A boolean (true if there are PRs needing fixes, false otherwise).
+   Example: {"items": [...], "count": N, "summarization": "...", "action_required": true/false}
 """
 
 

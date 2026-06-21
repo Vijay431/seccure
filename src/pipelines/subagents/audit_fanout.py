@@ -71,7 +71,7 @@ def enrich_dependabot_pr(
         source="dependabot_pr",
         package=str(pr.get("package") or package),
         ecosystem=ecosystem,
-        pr_number=int(pr.get("number") or pr.get("pr_number")),
+        pr_number=int(pr.get("number") or pr.get("pr_number") or 0),
         from_version=pr.get("from_version") or from_version,
         to_version=pr.get("to_version") or to_version,
         url=pr.get("html_url") or pr.get("url"),
@@ -102,7 +102,7 @@ def _code_alert_to_finding(alert: dict[str, Any]) -> CodeScanningFinding:
         severity=str(alert.get("severity") or "unknown"),
         description=str(alert.get("description") or ""),
         url=str(alert.get("url") or ""),
-        alert_number=int(alert.get("number") or alert.get("alert_number")),
+        alert_number=int(alert.get("number") or alert.get("alert_number") or 0),
     )
 
 

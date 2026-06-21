@@ -27,7 +27,7 @@ class RobustMCPManager:
     def __init__(self, retry_limit: int = 3):
         self.retry_limit = retry_limit
         self.client = None
-        self._tools_cache = {}
+        self._tools_cache: dict[str, Any] = {}
         self._lock = asyncio.Lock()
 
     async def __aenter__(self):

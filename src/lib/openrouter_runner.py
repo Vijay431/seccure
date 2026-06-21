@@ -129,7 +129,7 @@ class OpenRouterAgent:
                 elif "dict" in ann or "any" in ann:
                     param_type = "object"
 
-                prop = {"type": param_type}
+                prop: dict[str, Any] = {"type": param_type}
                 if param_type == "array":
                     prop["items"] = {"type": "string"}
 
@@ -170,7 +170,7 @@ class OpenRouterAgent:
                     f"Increase SECCURE_COORDINATOR_MAX_TOOLS (or "
                     f"SECCURE_SUBAGENT_MAX_TOOLS) to allow more steps."
                 )
-            kwargs = {
+            kwargs: dict[str, Any] = {
                 "model": self.model,
                 "messages": self.messages,
             }
@@ -258,17 +258,17 @@ class OpenRouterAgent:
                 print(f"[OpenRouter] Calling tool: {func_name}({args})")
                 _tool_call_count += 1
 
-                func = self.tool_map.get(func_name)
-                if not func:
+                tool_func = self.tool_map.get(func_name)
+                if tool_func is None:
                     result = f"Error: Tool {func_name} not found."
                 else:
                     try:
-                        call_args = self._prepare_tool_args(func, args)
+                        call_args = self._prepare_tool_args(tool_func, args)
 
-                        if inspect.iscoroutinefunction(func):
-                            result = await func(**call_args)
+                        if inspect.iscoroutinefunction(tool_func):
+                            result = await tool_func(**call_args)
                         else:
-                            result = func(**call_args)
+                            result = tool_func(**call_args)
                     except Exception as e:
                         result = f"Error: {e}"
 

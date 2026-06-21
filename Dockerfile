@@ -36,6 +36,6 @@ ENV PATH="/home/seccure/app/.venv/bin:${PATH}"
 RUN uv venv && uv pip install -r requirements.txt
 
 # Copy agent source
-COPY --chown=seccure:seccure agent/ ./agent/
+COPY --chown=seccure:seccure src/ ./src/
 
-CMD ["python", "agent/main.py"]
+CMD ["python", "src/main.py"]

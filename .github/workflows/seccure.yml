@@ -47,7 +47,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Run Seccure Agent
-        run: python /app/agent/main.py
+        run: python /app/src/main.py
         env:
           SECCURE_CONSTRAINTS_DIR: ${{ github.workspace }}/target_repo/.seccure
 

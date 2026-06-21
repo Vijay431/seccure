@@ -161,7 +161,7 @@ def with_attempt_marker(body: str, attempt_count: int) -> str:
 
 
 def render_pr_title_body(
-    state: SeccureState, commit_references: list[str] = None
+    state: SeccureState, commit_references: list[str] | None = None
 ) -> tuple[str, str]:
     fixed_rows = []
     for result in state.fix_results:

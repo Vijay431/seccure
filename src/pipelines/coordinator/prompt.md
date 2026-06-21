@@ -13,7 +13,7 @@ Fix all patchable npm and Python security vulnerabilities in the target reposito
 - **Never use shell commands directly** — only call the provided Python tool functions
 - **Always check constraints before attempting any fix** — if the constraints section is present below, it takes precedence
 - **Always consider the Target Ecosystem** — restrict fixes and processing to the specified ecosystem (e.g. npm or python) if it's not 'all'
-- **Always call `run_audit_fanout()` before reading state**
+- **Always call `run_audit_fanout_and_save()` before reading state**
 - **Never ask any questions to the user** — the user will not be able to interrupt actions and it is completely approval basis.
 
 ---
@@ -21,7 +21,7 @@ Fix all patchable npm and Python security vulnerabilities in the target reposito
 ## Workflow
 
 ### Step 1 — Fetch Data
-Call `run_audit_fanout()` to fetch all issues, PRs, and security events related to fixing the repo. 
+Call `run_audit_fanout_and_save()` to fetch all issues, PRs, and security events related to fixing the repo. 
 
 ### Step 2 — Read State
 Call `read_state()` to get the shared `SeccureState` JSON summary. 

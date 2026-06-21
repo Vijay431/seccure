@@ -38,7 +38,7 @@ class OpenRouterAgent:
         )
         self.client = AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1",
-            api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+            api_key=os.environ.get("OPENROUTER_API_KEY", "dummy_key"),
         )
         if tools:
             system_instructions += (
@@ -53,13 +53,7 @@ class OpenRouterAgent:
         self.total_token_count = 0
 
     @staticmethod
-    def _is_tool_context_param(param: inspect.Parameter) -> bool:
-        return "ToolContext" in str(param.annotation)
-
-    @staticmethod
     def _is_injected_param(param: inspect.Parameter) -> bool:
-        if OpenRouterAgent._is_tool_context_param(param):
-            return True
         if param.default is not inspect.Parameter.empty and callable(param.default):
             return True
         return "callable" in str(param.annotation).lower()
@@ -81,22 +75,7 @@ class OpenRouterAgent:
         sig = inspect.signature(func)
         args: dict[str, Any] = {}
         for name, param in sig.parameters.items():
-            if OpenRouterAgent._is_tool_context_param(param):
-
-                class DummyContext:
-                    def __init__(self):
-                        self.state = {}
-
-                    def get_state(self, key):
-                        return self.state.get(key)
-
-                    def set_state(self, key, val):
-                        self.state[key] = val
-
-                args[name] = DummyContext()
-            elif (
-                not OpenRouterAgent._is_injected_param(param) and name in supplied_args
-            ):
+            if not OpenRouterAgent._is_injected_param(param) and name in supplied_args:
                 args[name] = supplied_args[name]
         return args
 

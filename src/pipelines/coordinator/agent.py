@@ -39,11 +39,26 @@ def build_coordinator(system_prompt: str) -> OpenRouterAgent:
     Returns:
         Configured OpenRouter agent ready to be used as an async context manager.
     """
+    from src.config.config import ToolResult
+
+    async def run_audit_fanout_and_save() -> ToolResult:
+        """Run the three audit sources concurrently and save results to state."""
+        res = await run_audit_fanout()
+        if res.ok and res.data and isinstance(res.data, dict):
+            write_state_section(
+                "security_issues", res.data.get("security_issues", {}).get("items", [])
+            )
+            write_state_section(
+                "dependabot_prs", res.data.get("dependabot_prs", {}).get("items", [])
+            )
+            write_state_section("alerts", res.data.get("alerts", {}).get("items", []))
+        return res
+
     tools_list = [
         # Shared state
         read_state,
         write_state_section,
-        run_audit_fanout,
+        run_audit_fanout_and_save,
         # Constraints (can be re-read mid-run if needed)
         read_repo_constraints,
         # Idempotency guard
@@ -92,8 +107,46 @@ def build_coordinator(system_prompt: str) -> OpenRouterAgent:
             text = await response.text()
             return text
 
+    class CoordinatorAgent(OpenRouterAgent):
+        async def chat(self, prompt: str):
+            try:
+                return await super().chat(prompt)
+            except Exception as e:
+                import os
+                import subprocess
+
+                from src.lib.state import write_state_section
+
+                print(f"[Seccure] Exception caught during coordinator execution: {e}")
+                print(
+                    "[Seccure] Performing secure teardown (git reset --hard, git clean -fd)"
+                )
+                try:
+                    subprocess.run(["git", "reset", "--hard"], check=False)
+                    subprocess.run(["git", "clean", "-fd"], check=False)
+                except Exception as teardown_err:
+                    print(f"[Seccure] Teardown failed: {teardown_err}")
+
+                summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+                if summary_file:
+                    try:
+                        with open(summary_file, "a") as f:
+                            f.write(
+                                f"\n## 🚨 Seccure Agent Failed\n\n**Error**: `{str(e)}`\n\nPerformed secure teardown of the workspace.\n"
+                            )
+                    except Exception:
+                        pass
+
+                try:
+                    write_state_section("status", "error")
+                    write_state_section("errors", [str(e)])
+                except Exception:
+                    pass
+
+                raise e
+
     tools_list.append(invoke_subagent)
-    return OpenRouterAgent(
+    return CoordinatorAgent(
         system_instructions=system_prompt,
         tools=tools_list,
         model="openai/gpt-5-nano",

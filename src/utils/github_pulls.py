@@ -89,9 +89,12 @@ _ATTEMPT_RE = re.compile(r"<!--\s*seccure-attempt-count:(\d+)\s*-->")
 def _get_owner_repo() -> tuple[str, str]:
     import os
 
+    from src.utils.repo_utils import sanitize_repo_name
+
     repo_env = os.environ.get("TARGET_REPO") or os.environ.get("GITHUB_REPOSITORY")
     if repo_env:
-        parts = repo_env.split("/")
+        sanitized = sanitize_repo_name(repo_env)
+        parts = sanitized.split("/")
         if len(parts) == 2:
             return parts[0], parts[1]
 
@@ -103,12 +106,10 @@ def _get_owner_repo() -> tuple[str, str]:
             check=True,
         )
         url = res.stdout.strip()
-        if url.startswith("https://github.com/") or url.startswith("git@github.com:"):
-            path = url.split("github.com")[-1].lstrip(":/")
-            path = path.removesuffix(".git")
-            parts = path.split("/")
-            if len(parts) == 2:
-                return parts[0], parts[1]
+        sanitized = sanitize_repo_name(url)
+        parts = sanitized.split("/")
+        if len(parts) == 2:
+            return parts[0], parts[1]
     except Exception:
         pass
 

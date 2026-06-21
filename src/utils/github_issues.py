@@ -7,9 +7,12 @@ from src.utils.mcp_client import get_mcp_manager
 
 
 def _get_owner_repo() -> tuple[str, str]:
+    from src.utils.repo_utils import sanitize_repo_name
+
     repo_env = os.environ.get("TARGET_REPO") or os.environ.get("GITHUB_REPOSITORY")
     if repo_env:
-        parts = repo_env.split("/")
+        sanitized = sanitize_repo_name(repo_env)
+        parts = sanitized.split("/")
         if len(parts) == 2:
             return parts[0], parts[1]
 
@@ -22,13 +25,10 @@ def _get_owner_repo() -> tuple[str, str]:
             check=True,
         )
         url = res.stdout.strip()
-        # e.g., https://github.com/owner/repo.git or git@github.com:owner/repo.git
-        if url.startswith("https://github.com/") or url.startswith("git@github.com:"):
-            path = url.split("github.com")[-1].lstrip(":/")
-            path = path.removesuffix(".git")
-            parts = path.split("/")
-            if len(parts) == 2:
-                return parts[0], parts[1]
+        sanitized = sanitize_repo_name(url)
+        parts = sanitized.split("/")
+        if len(parts) == 2:
+            return parts[0], parts[1]
     except Exception:
         pass
 
@@ -43,7 +43,7 @@ _security_issues_cache = None
 async def list_security_issues() -> str:
     """Fetch all open GitHub issues labelled 'security' or 'dependabot'.
     Excludes pull requests. Deduplicates by issue number.
-    Uses ToolContext caching to avoid duplicate API calls within one turn.
+    Uses in-memory caching to avoid duplicate API calls within one turn.
     """
     global _security_issues_cache
     if _security_issues_cache is not None:

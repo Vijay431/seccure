@@ -7,7 +7,6 @@ from collections.abc import Callable
 from typing import Any
 
 from src.config.config import ToolResult
-from src.lib.state import read_state, write_state_section
 from src.utils.github_issues import list_security_issues
 from src.utils.github_pulls import list_dependabot_prs
 from src.utils.github_security import (
@@ -25,19 +24,13 @@ async def run_audit_fanout() -> ToolResult:
     # Explicit allow-lists for US1
     issue_tools: list[Callable[..., Any]] = [
         list_security_issues,
-        read_state,
-        write_state_section,
     ]
     pr_tools: list[Callable[..., Any]] = [
         list_dependabot_prs,
-        read_state,
-        write_state_section,
     ]
     security_tools: list[Callable[..., Any]] = [
         list_dependabot_alerts,
         list_code_scanning_alerts,
-        read_state,
-        write_state_section,
     ]
 
     issue_agent = build_audit_issue_agent(tools=issue_tools)
@@ -45,12 +38,23 @@ async def run_audit_fanout() -> ToolResult:
     security_agent = build_audit_security_agent(tools=security_tools)
 
     try:
+        import json
+
         async with issue_agent as ia, pr_agent as pa, security_agent as sa:
-            await asyncio.gather(
-                ia.chat("Begin issue audit. Write to state and return."),
-                pa.chat("Begin PR audit. Write to state and return."),
-                sa.chat("Begin security audit. Write to state and return."),
+            issue_res, pr_res, sec_res = await asyncio.gather(
+                ia.chat("Begin issue audit. Return the IssueSummary."),
+                pa.chat("Begin PR audit. Return the PRSummary."),
+                sa.chat("Begin security audit. Return the AlertSummary."),
             )
+            issue_text = await issue_res.text()
+            pr_text = await pr_res.text()
+            sec_text = await sec_res.text()
+
+            data = {
+                "security_issues": json.loads(issue_text),
+                "dependabot_prs": json.loads(pr_text),
+                "alerts": json.loads(sec_text),
+            }
     except PermissionError as exc:
         return ToolResult(ok=False, fatal=True, message=str(exc))
     except Exception as exc:
@@ -61,6 +65,6 @@ async def run_audit_fanout() -> ToolResult:
         ok=True,
         fatal=False,
         message="audit fan-out completed",
-        data={},
+        data=data,
         reasoning_summary="Spawned AuditIssueAgent, AuditPRAgent, and AuditSecurityAgent concurrently.",
     )

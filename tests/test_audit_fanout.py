@@ -15,6 +15,7 @@ async def test_run_audit_fanout_success(mock_sec, mock_pr, mock_iss):
     mock_agent.__aexit__ = AsyncMock(return_value=False)
 
     mock_response = MagicMock()
+    mock_response.text = AsyncMock(return_value="{}")
     mock_agent.chat = AsyncMock(return_value=mock_response)
 
     mock_sec.return_value = mock_agent

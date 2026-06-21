@@ -12,7 +12,8 @@ async def list_dependabot_alerts() -> str:
 
     try:
         data = await manager.call_tool_with_retry(
-            "list_dependabot_alerts", {"owner": owner, "repo": repo, "state": "open", "perPage": 100}
+            "list_dependabot_alerts",
+            {"owner": owner, "repo": repo, "state": "open", "perPage": 100},
         )
     except Exception as e:
         print(f"[Seccure] Warning: list_dependabot_alerts failed: {e}", file=sys.stderr)
@@ -40,18 +41,28 @@ async def list_code_scanning_alerts() -> str:
 
     try:
         data = await manager.call_tool_with_retry(
-            "list_code_scanning_alerts", {"owner": owner, "repo": repo, "state": "open", "perPage": 100}
+            "list_code_scanning_alerts",
+            {"owner": owner, "repo": repo, "state": "open", "perPage": 100},
         )
     except Exception as e:
-        print(f"[Seccure] Warning: list_code_scanning_alerts failed: {e}", file=sys.stderr)
+        print(
+            f"[Seccure] Warning: list_code_scanning_alerts failed: {e}", file=sys.stderr
+        )
         return "[]"
 
     if not data or not isinstance(data, list) or "text" not in data[0]:
         return "[]"
 
     items_text = data[0]["text"]
-    if items_text.startswith("failed to ") or "not enabled" in items_text.lower() or "no analysis" in items_text.lower():
-        print(f"[Seccure] list_code_scanning_alerts error/not-enabled: {items_text}", file=sys.stderr)
+    if (
+        items_text.startswith("failed to ")
+        or "not enabled" in items_text.lower()
+        or "no analysis" in items_text.lower()
+    ):
+        print(
+            f"[Seccure] list_code_scanning_alerts error/not-enabled: {items_text}",
+            file=sys.stderr,
+        )
         return "[]"
 
     try:

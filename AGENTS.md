@@ -44,21 +44,21 @@ Instead, the Coordinator spawns three specialized **Audit Subagents** in paralle
 
 ---
 
-## 🚀 3. The Post-Fix PRAgent
+## 🚀 3. Pull Request Handling
 
-After the Coordinator successfully patches vulnerabilities and validates the state locally, it spawns the **PRAgent**.
+After the Coordinator successfully patches vulnerabilities and validates the state locally, it handles PR creation and branch management directly.
 * **Job:** Handles all Git and GitHub interactions to publish the fixes. It creates the branch, commits the files, pushes to the remote, and handles Pull Request creation or updates.
-* **Benefit:** Separates the complex logic of vulnerability resolution from the mechanical API steps of formatting and publishing PRs.
+* **Benefit:** Centralizing PR creation in the Coordinator removes the need for write-capable subagents, significantly reducing the attack surface.
 
 ---
 
 ## 💾 4. Shared State Management (`SeccureState`)
 
-The LangChain agents do not pass massive strings to one another. Instead, they communicate via a persistent disk-based state file: `seccure_state_{run_id}.json`.
+The LangChain agents communicate by returning structured Pydantic models.
 
-1. The Coordinator creates the empty state file.
-2. The subagents run in parallel, using the `write_state_section` tool to independently save their typed summaries to the disk.
-3. The Coordinator uses the `read_state` tool to pull all the clean, structured data back into its context before planning its fixes.
+1. The Coordinator delegates tasks to the subagents in parallel.
+2. The subagents run read-only tools to gather their required data and return strictly typed Pydantic summaries.
+3. The Coordinator synchronously aggregates these summaries into a unified `SeccureState` memory object, ensuring subagents cannot overwrite or corrupt shared state.
 
 **Deployment Integrity:** The state file is automatically persisted to the `GITHUB_WORKSPACE` directory. This allows the host GitHub Actions runner to extract the state artifact cleanly right after the Docker container exits, keeping the user's workflow completely uncluttered and removing the need for manual file-routing.
 
@@ -71,4 +71,4 @@ Because Seccure is an autonomous agent executing destructive system commands and
 When run with `LANGCHAIN_TRACING_V2="true"`, Seccure dynamically wraps its internal execution loop:
 * **Tool Call Tracking:** Every LangChain tool (e.g., `clone_repo`, `run_npm_audit_fix`) is decorated with a LangSmith `@traceable` hook.
 * **Execution Graph:** The coordinator's reasoning loop, planning steps, and exact shell tool stdout/stderr outputs are logged hierarchically under a `SeccureAgentRun` chain.
-* **Fallback & Recovery:** If a bash command fails, native LangChain tools intercept the error and return it as a string to the LLM. For critical errors like rate limits or server disconnects, native OpenRouter SDK retries handle backoff transparently. Unauthorized tool usage (e.g., accessing an out-of-scope repository) causes an immediate hard crash (`sys.exit(1)`) to ensure system integrity.
+* **Fallback & Recovery:** The Coordinator is wrapped in a native LangChain resilience layer (`ResilientOpenRouterAgent`). If a bash command fails or an unauthorized tool usage occurs (e.g., accessing an out-of-scope repository), the agent intercepts the error, runs a secure teardown (`git reset --hard`, `git clean -fd`), logs the failure to `GITHUB_STEP_SUMMARY`, and causes an immediate hard crash (`sys.exit(1)`) to ensure system integrity.

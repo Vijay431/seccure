@@ -12,9 +12,9 @@ def test_subagent_explicit_allowlist():
     pr_agent = build_pr_agent()
 
     # Assert they have tools
-    assert len(issue_agent.tools) == 3
-    assert len(pr_audit_agent.tools) == 3
-    assert len(security_agent.tools) == 4
+    assert len(issue_agent.tools) == 1
+    assert len(pr_audit_agent.tools) == 1
+    assert len(security_agent.tools) == 2
     assert len(pr_agent.tools) == 6
 
     # Verify we can pass custom tools

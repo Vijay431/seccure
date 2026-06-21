@@ -115,8 +115,7 @@ If a constraint blocks a fix, Seccure will skip the patch and automatically crea
 
 Seccure uses a **Coordinator-Subagent architecture** driven by OpenRouter:
 
-1. **Coordinator Agent** (`openai/gpt-5-nano` via OpenRouter): Orchestrates the entire flow. It has access to safe, Python-wrapped subprocess shell tools (`git clone`, `npm audit fix`) and GitHub write tools.
-2. **IssueAgent**, **PRAgent**, **SecurityAgent** (`openai/gpt-4o-mini` via OpenRouter): Narrow-context subagents that read GitHub APIs and write structured Pydantic summaries (`AlertSummary`, etc.) to a shared JSON state file.
+1. **Coordinator Agent** (`openai/gpt-5-nano` via OpenRouter): Orchestrates the entire flow. It has access to safe, Python-wrapped subprocess shell tools (`git clone`, `npm audit fix`) and GitHub write tools. The Coordinator manages all state and implements a secure teardown (`git reset --hard`) on unexpected failures.
+2. **IssueAgent**, **PRAgent**, **SecurityAgent** (`openai/gpt-4o-mini` via OpenRouter): Narrow-context subagents equipped with strictly read-only tools. They read GitHub APIs and return structured Pydantic summaries (`AlertSummary`, etc.) back to the Coordinator, eliminating the risk of subagents corrupting state.
 
-All LLM actions run unattended through deterministic Python tools with bounded
-tool-call budgets and redacted logs. The `TARGET_REPO` environment variable is strictly enforced by the MCP client, preventing any rogue agent behavior from affecting unauthorized repositories.
+All LLM actions run unattended through deterministic Python tools with bounded tool-call budgets and redacted logs. The `TARGET_REPO` environment variable is strictly enforced at multiple layers (MCP client, GitHub API, git commands), proactively verifying permissions and immediately exiting upon mismatch to prevent cross-repository contamination.

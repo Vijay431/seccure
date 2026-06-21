@@ -77,6 +77,14 @@ def _verify_github_access(repo: str, token: str) -> None:
         print("[Seccure] ❌ FATAL: GITHUB_TOKEN environment variable is missing.")
         sys.exit(1)
 
+    if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
+        gh_repo = os.environ.get("GITHUB_REPOSITORY")
+        if gh_repo and repo.lower() != gh_repo.lower():
+            print(
+                f"[Seccure] ❌ FATAL: TARGET_REPO ({repo}) does not match GITHUB_REPOSITORY ({gh_repo}). Cross-repository contamination is forbidden."
+            )
+            sys.exit(1)
+
     url = f"https://api.github.com/repos/{repo}"
     req = urllib.request.Request(
         url,
@@ -121,8 +129,13 @@ def _trace_if_enabled(func):
 @_trace_if_enabled
 async def main() -> None:
     """Main entrypoint — initialise state and run the Coordinator."""
-    run_id = os.environ["GITHUB_RUN_ID"]
-    repo = os.environ.get("TARGET_REPO") or os.environ["GITHUB_REPOSITORY"]
+    run_id = os.environ.get("GITHUB_RUN_ID", "local")
+
+    repo_raw = os.environ.get("TARGET_REPO") or os.environ.get("GITHUB_REPOSITORY", "")
+    from src.utils.repo_utils import sanitize_repo_name
+
+    repo = sanitize_repo_name(repo_raw)
+
     ecosystem = os.environ.get("ECOSYSTEM", "all").lower()
     today = date.today().strftime("%Y%m%d")
     fix_branch = f"seccure/auto-fix-{today}"

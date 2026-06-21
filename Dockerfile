@@ -8,12 +8,13 @@ LABEL org.opencontainers.image.source="https://github.com/owner/seccure"
 # Copy uv from the official image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Install curl, git, bash
+# Install curl, git, bash, docker.io
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         git \
         ca-certificates \
         bash \
+        docker.io \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

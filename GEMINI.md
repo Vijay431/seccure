@@ -11,6 +11,9 @@ Auto-generated from all feature plans. Last updated: 2026-06-19
 - N/A (Pinecone is used elsewhere, here we just use GitHub API state) (001-fix-pr-agent)
 - Python >= 3.12 + None new added. (001-cleanup-scripts)
 - N/A (State is kept in memory and shared state file) (001-update-subagents)
+- Python 3.12 + LangChain, `langchain-mcp-adapters`, `mcp` (001-github-mcp-server)
+- N/A (Pinecone is used elsewhere) (001-github-mcp-server)
+- N/A (Pinecone handles vector memory elsewhere) (001-github-mcp-server)
 
 - Python >= 3.12 + LangChain, Pydantic, LangSmith (001-seccure-migration)
 
@@ -30,9 +33,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python >= 3.12: Follow standard conventions
 
 ## Recent Changes
+- 001-github-mcp-server: Added Python 3.12 + LangChain, `langchain-mcp-adapters`, `mcp`
+- 001-github-mcp-server: Added Python 3.12 + LangChain, `langchain-mcp-adapters`, `mcp`
 - 001-update-subagents: Added Python 3.12 + LangChain, Pydantic
-- 001-cleanup-scripts: Added Python >= 3.12 + None new added.
-- 001-cleanup-scripts: Added Python >= 3.12 + None new added.
 
 
 <!-- MANUAL ADDITIONS START -->

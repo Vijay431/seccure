@@ -24,6 +24,7 @@ htmlcov/
 
 # AI files
 .agent/
+.agents/
 .specify/
 specs/
 

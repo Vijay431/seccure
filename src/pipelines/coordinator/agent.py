@@ -72,7 +72,7 @@ def build_coordinator(system_prompt: str) -> OpenRouterAgent:
         try:
             from langsmith import traceable
 
-            tools_list = [traceable(t) if callable(t) else t for t in tools_list]
+            tools_list = [traceable(t) if callable(t) else t for t in tools_list]  # type: ignore
         except ImportError:
             print("[Seccure] Warning: langsmith not installed. Skipping tracing.")
 

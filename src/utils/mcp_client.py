@@ -81,7 +81,7 @@ class RobustMCPManager:
             if not self.client:
                 await self.start_server()
 
-            wrapped_tools = []
+            wrapped_tools: list[BaseTool] = []
             for _name, tool in self._tools_cache.items():
                 wrapped_tools.append(
                     RobustMCPToolWrapper(

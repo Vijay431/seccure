@@ -37,8 +37,8 @@ class ResilientOpenRouterAgent(OpenRouterAgent):
                 raise last_err
 
         # Patch the client's create method for this chat call
-        self.client.chat.completions.create = _retrying_create
+        self.client.chat.completions.create = _retrying_create  # type: ignore[method-assign]
         try:
             return await super().chat(prompt)
         finally:
-            self.client.chat.completions.create = original_create
+            self.client.chat.completions.create = original_create  # type: ignore[method-assign]

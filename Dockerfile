@@ -2,7 +2,7 @@
 FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="Seccure"
-LABEL org.opencontainers.image.description="Automated npm security vulnerability fixer using Google ADK"
+LABEL org.opencontainers.image.description="Automated npm security vulnerability fixer using LangChain"
 LABEL org.opencontainers.image.source="https://github.com/owner/seccure"
 
 # Copy uv from the official image

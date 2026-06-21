@@ -1,6 +1,6 @@
 # Seccure Multi-Agent Architecture
 
-Seccure is not a traditional procedural script. It is an autonomous, goal-oriented system powered by the **Google Agent Development Kit (ADK)**. 
+Seccure is not a traditional procedural script. It is an autonomous, goal-oriented system powered by **LangChain via OpenRouter**. 
 
 To manage complexity, avoid context-window bloat, and prevent LLM hallucinations, Seccure uses a **Coordinator-Subagent architecture**. This document outlines the responsibilities of each AI agent in the system, as well as the execution and observability lifecycle.
 
@@ -54,7 +54,7 @@ After the Coordinator successfully patches vulnerabilities and validates the sta
 
 ## 💾 4. Shared State Management (`SeccureState`)
 
-The ADK agents do not pass massive strings to one another. Instead, they communicate via a persistent disk-based state file: `seccure_state_{run_id}.json`.
+The LangChain agents do not pass massive strings to one another. Instead, they communicate via a persistent disk-based state file: `seccure_state_{run_id}.json`.
 
 1. The Coordinator creates the empty state file.
 2. The subagents run in parallel, using the `write_state_section` tool to independently save their typed summaries to the disk.
@@ -69,6 +69,6 @@ The ADK agents do not pass massive strings to one another. Instead, they communi
 Because Seccure is an autonomous agent executing destructive system commands and writing to live repositories, visibility into its decision-making is critical. Seccure natively integrates with **LangSmith** for granular tracing.
 
 When run with `LANGCHAIN_TRACING_V2="true"`, Seccure dynamically wraps its internal execution loop:
-* **Tool Call Tracking:** Every ADK tool (e.g., `clone_repo`, `run_npm_audit_fix`) is decorated with a LangSmith `@traceable` hook.
+* **Tool Call Tracking:** Every LangChain tool (e.g., `clone_repo`, `run_npm_audit_fix`) is decorated with a LangSmith `@traceable` hook.
 * **Execution Graph:** The coordinator's reasoning loop, planning steps, and exact shell tool stdout/stderr outputs are logged hierarchically under a `SeccureAgentRun` chain.
 * **Fallback & Recovery:** If a bash command fails, the `FallbackHook` intercepts the error and the agent is forced to retry. LangSmith captures these mid-flight corrections, allowing maintainers to seamlessly review *why* the agent chose a specific fix strategy.

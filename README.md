@@ -16,7 +16,7 @@ Seccure runs as a completely unattended background agent. It gathers alerts, PRs
 
 ## 🚀 How to use Seccure in your repositories
 
-Seccure is distributed as a **Docker image**. You don't need to install Python or the ADK in your target repositories. You just need to drop in a single GitHub Actions workflow file.
+Seccure is distributed as a **Docker image**. You don't need to install Python or LangChain in your target repositories. You just need to drop in a single GitHub Actions workflow file.
 
 ### 1. Prerequisites (Target Repo)
 

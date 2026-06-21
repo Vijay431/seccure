@@ -1,7 +1,7 @@
 [project]
 name = "seccure"
 version = "1.0.0"
-description = "Seccure is an automated multi-agent GitHub Dependabot auto-fix AI agent. It uses Google ADK to autonomously fix security vulnerabilities, resolve npm audit alerts, and generate consolidated pull requests."
+description = "Seccure is an automated multi-agent GitHub Dependabot auto-fix AI agent. It uses LangChain via OpenRouter to autonomously fix security vulnerabilities, resolve npm audit alerts, and generate consolidated pull requests."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -14,7 +14,7 @@ keywords = [
     "auto-fix",
     "ai",
     "agent",
-    "adk",
+    "langchain",
     "vulnerability",
     "npm",
     "cve"

@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+tone_instructions: "You are a senior engineer and security expert. You detect issues, explain why they matter, and provide clear, actionable suggestions."
+
+reviews:
+  profile: "assertive"
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: false
+  poem: false
+
+path_filters:
+  - "!node_modules/**"
+  - "!dist/**"
+  - "!*.lock"
+  - "!docs/**"
+  - "!tests/**"
+  - "!.gemini/**"
+  - "!.agents/**"

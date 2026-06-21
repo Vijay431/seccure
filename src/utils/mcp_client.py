@@ -30,6 +30,19 @@ class RobustMCPManager:
         self._tools_cache: dict[str, Any] = {}
         self._lock = asyncio.Lock()
 
+        self.target_repo: str | None = None
+
+        target_repo_env = os.environ.get("TARGET_REPO")
+        if target_repo_env:
+            from src.utils.repo_utils import sanitize_repo_name
+
+            self.target_repo = sanitize_repo_name(target_repo_env)
+
+        if not self.target_repo:
+            raise ValueError(
+                "TARGET_REPO environment variable is not set. Cannot initialize MCP client."
+            )
+
     async def __aenter__(self):
         await self.start_server()
         return self
@@ -50,6 +63,8 @@ class RobustMCPManager:
                     "-e",
                     "GITHUB_HOST",
                     "ghcr.io/github/github-mcp-server",
+                    "stdio",
+                    "--toolsets=all",
                 ],
                 "transport": "stdio",
                 "env": {
@@ -95,6 +110,31 @@ class RobustMCPManager:
             return wrapped_tools
 
     async def call_tool_with_retry(self, tool_name: str, kwargs_dict: dict):
+        # US2: Intercept requests to other repos
+        repo_arg = kwargs_dict.get("repo")
+        owner_arg = kwargs_dict.get("owner")
+
+        repo_to_check = None
+        if repo_arg and "/" in repo_arg:
+            repo_to_check = repo_arg
+        elif owner_arg and repo_arg:
+            repo_to_check = f"{owner_arg}/{repo_arg}"
+
+        if (
+            repo_to_check
+            and self.target_repo
+            and repo_to_check.lower() != self.target_repo.lower()
+        ):
+            msg = f"Access to repo {repo_to_check} is forbidden. Only TARGET_REPO {self.target_repo} is allowed."
+            logger.error(msg)
+            import sys
+
+            sys.exit(1)
+
+        async with self._lock:
+            if not self.client or not self._tools_cache:
+                await self.start_server()
+
         attempts = 0
         while attempts <= self.retry_limit:
             try:
@@ -102,7 +142,28 @@ class RobustMCPManager:
                 if not actual_tool:
                     raise ValueError(f"Tool {tool_name} not found in MCP server")
 
-                return await actual_tool.ainvoke(kwargs_dict)
+                res = await actual_tool.ainvoke(kwargs_dict)
+
+                # Check for rate limits returning as text instead of exceptions
+                if res and isinstance(res, list) and "text" in res[0]:
+                    text_out = res[0]["text"]
+                    if (
+                        isinstance(text_out, str)
+                        and "You have exceeded a secondary rate limit" in text_out
+                    ):
+                        import re
+
+                        m = re.search(r"\[retry after (\d+)s\]", text_out)
+                        wait_time = int(m.group(1)) if m else 30
+                        logger.warning(
+                            f"Rate limited by GitHub API. Waiting {wait_time}s before retrying..."
+                        )
+                        await asyncio.sleep(wait_time + 1)
+                        # Don't restart server, just retry
+                        attempts += 1
+                        continue
+
+                return res
             except Exception as e:
                 attempts += 1
                 logger.warning(

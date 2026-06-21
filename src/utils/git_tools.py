@@ -64,6 +64,13 @@ def clone_repo(repo: str, branch: str) -> str:
     """
     import shutil
 
+    from src.utils.repo_utils import sanitize_repo_name
+
+    target = os.environ.get("TARGET_REPO") or os.environ.get("GITHUB_REPOSITORY", "")
+    target = sanitize_repo_name(target)
+    if sanitize_repo_name(repo) != target:
+        return f"Error: Cannot clone {repo}. Operations are strictly restricted to TARGET_REPO: {target}."
+
     token = os.environ["GITHUB_TOKEN"]
     url = f"https://x-access-token:{token}@github.com/{repo}.git"
 
@@ -307,6 +314,13 @@ def push_branch(branch_name: str, repo: str) -> str:
     Returns:
         Confirmation or error.
     """
+    from src.utils.repo_utils import sanitize_repo_name
+
+    target = os.environ.get("TARGET_REPO") or os.environ.get("GITHUB_REPOSITORY", "")
+    target = sanitize_repo_name(target)
+    if sanitize_repo_name(repo) != target:
+        return f"Error: Cannot push to {repo}. Operations are strictly restricted to TARGET_REPO: {target}."
+
     token = os.environ["GITHUB_TOKEN"]
     remote_url = f"https://x-access-token:{token}@github.com/{repo}.git"
     _run(["git", "remote", "set-url", "origin", remote_url])

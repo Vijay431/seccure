@@ -19,7 +19,10 @@ def test_subagent_explicit_allowlist():
     assert pr_audit_agent.tools[0].__name__ == "list_dependabot_prs"
 
     assert len(security_agent.tools) == 2
-    assert {t.__name__ for t in security_agent.tools} == {"list_dependabot_alerts", "list_code_scanning_alerts"}
+    assert {t.__name__ for t in security_agent.tools} == {
+        "list_dependabot_alerts",
+        "list_code_scanning_alerts",
+    }
 
     assert len(pr_agent.tools) == 6
     assert {t.__name__ for t in pr_agent.tools} == {
@@ -28,7 +31,7 @@ def test_subagent_explicit_allowlist():
         "create_fix_branch",
         "commit_changes",
         "push_branch",
-        "upsert_seccure_pr"
+        "upsert_seccure_pr",
     }
 
     # Verify we can pass custom tools

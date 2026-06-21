@@ -68,6 +68,51 @@ issue with the reason: "blocked by repo constraint: <quote the relevant rule>".
 """
 
 
+def _verify_github_access(repo: str, token: str) -> None:
+    """Verify that the GitHub token has access to the target repository."""
+    import urllib.error
+    import urllib.request
+
+    if not token:
+        print("[Seccure] ❌ FATAL: GITHUB_TOKEN environment variable is missing.")
+        sys.exit(1)
+
+    if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
+        gh_repo = os.environ.get("GITHUB_REPOSITORY")
+        if gh_repo and repo.lower() != gh_repo.lower():
+            print(
+                f"[Seccure] ❌ FATAL: TARGET_REPO ({repo}) does not match GITHUB_REPOSITORY ({gh_repo}). Cross-repository contamination is forbidden."
+            )
+            sys.exit(1)
+
+    url = f"https://api.github.com/repos/{repo}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "Seccure-Agent",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            if response.status != 200:
+                print(
+                    f"[Seccure] ❌ FATAL: Failed to access repo {repo}. Status: {response.status}"
+                )
+                sys.exit(1)
+    except urllib.error.HTTPError as e:
+        print(
+            f"[Seccure] ❌ FATAL: Permission error accessing {repo}: {e.code} {e.reason}"
+        )
+        print("Ensure GITHUB_TOKEN has read/write access to TARGET_REPO.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[Seccure] ❌ FATAL: Unexpected error verifying repo access: {e}")
+        sys.exit(1)
+
+
 def _trace_if_enabled(func):
     import os
 
@@ -84,14 +129,23 @@ def _trace_if_enabled(func):
 @_trace_if_enabled
 async def main() -> None:
     """Main entrypoint — initialise state and run the Coordinator."""
-    run_id = os.environ["GITHUB_RUN_ID"]
-    repo = os.environ.get("TARGET_REPO") or os.environ["GITHUB_REPOSITORY"]
+    run_id = os.environ.get("GITHUB_RUN_ID", "local")
+
+    repo_raw = os.environ.get("TARGET_REPO") or os.environ.get("GITHUB_REPOSITORY", "")
+    from src.utils.repo_utils import sanitize_repo_name
+
+    repo = sanitize_repo_name(repo_raw)
+
     ecosystem = os.environ.get("ECOSYSTEM", "all").lower()
     today = date.today().strftime("%Y%m%d")
     fix_branch = f"seccure/auto-fix-{today}"
 
     print(f"[Seccure] Starting run {run_id} for repo: {repo} (ecosystem: {ecosystem})")
     print(f"[Seccure] Fix branch: {fix_branch}")
+
+    # 0. Proactive permission verification
+    github_token = os.environ.get("GITHUB_TOKEN", "")
+    _verify_github_access(repo, github_token)
 
     # 1. Load repo-specific constraints (may be empty string)
     constraints = await load_constraints_text()

@@ -2,7 +2,7 @@ google-antigravity
 pydantic>=2.7.0
 langsmith>=0.1.0
 openai>=1.0.0
-tenacity>=8.0.0
+tenacity>=9.1.4
 langchain
 langchain-mcp-adapters
 mcp

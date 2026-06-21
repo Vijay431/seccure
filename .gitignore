@@ -9,6 +9,9 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+.ruff_cache/
+.mypy_cache/
+*.log
 
 # Local workspace directories
 /tmp/seccure_workspace/
@@ -23,11 +26,14 @@ htmlcov/
 *.swo
 
 # AI files
-.agent/
+.agents/
 .specify/
 specs/
+skills-lock.json
 
 # OS files
 .DS_Store
 Thumbs.db
 .venv/
+
+TODO.md

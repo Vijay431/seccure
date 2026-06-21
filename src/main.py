@@ -91,7 +91,7 @@ async def main() -> None:
     print(f"[Seccure] Fix branch: {fix_branch}")
 
     # 1. Load repo-specific constraints (may be empty string)
-    constraints = load_constraints_text()
+    constraints = await load_constraints_text()
     if constraints:
         print(
             "[Seccure] Repo constraints loaded — will be injected into "
@@ -181,6 +181,10 @@ Begin now. Follow your system instructions exactly.
             f"thinking: {usage.thoughts_token_count:,} | "
             f"total: {usage.total_token_count:,}"
         )
+
+    # 6. Graceful shutdown
+    from src.utils.mcp_client import get_mcp_manager
+    await get_mcp_manager().stop_server()
 
 
 if __name__ == "__main__":

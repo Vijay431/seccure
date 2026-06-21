@@ -26,6 +26,7 @@ htmlcov/
 *.swo
 
 # AI files
+.agent/
 .agents/
 .specify/
 specs/

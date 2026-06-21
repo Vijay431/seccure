@@ -133,6 +133,8 @@ class IssueSummary(BaseModel):
 
     items: list[IssueItem]
     count: int
+    summarization: str
+    action_required: bool
 
 
 class PRSummary(BaseModel):
@@ -140,6 +142,8 @@ class PRSummary(BaseModel):
 
     items: list[PRItem]
     count: int
+    summarization: str
+    action_required: bool
 
 
 class AlertSummary(BaseModel):
@@ -149,6 +153,8 @@ class AlertSummary(BaseModel):
     count: int
     critical_count: int
     high_count: int
+    summarization: str
+    action_required: bool
 
 
 # ---------------------------------------------------------------------------

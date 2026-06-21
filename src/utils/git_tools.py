@@ -21,6 +21,7 @@ def _run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
     # Wrap npm/node commands to use nvm and respect .nvmrc
     if cmd[0] in ("npm", "node", "npx"):
         import shlex
+
         nvm_dir = os.environ.get("NVM_DIR", "/home/seccure/.nvm")
         escaped_cmd = " ".join(shlex.quote(c) for c in cmd)
 
@@ -137,7 +138,9 @@ def run_auto_fix(ecosystem: str = "npm") -> str:
     return json.dumps({"error": f"Auto-fix not implemented for ecosystem: {ecosystem}"})
 
 
-def apply_package_override(package: str, safe_version: str, ecosystem: str = "npm") -> str:
+def apply_package_override(
+    package: str, safe_version: str, ecosystem: str = "npm"
+) -> str:
     """Add or update an entry to override nested dependencies.
 
     Args:
@@ -168,7 +171,9 @@ def apply_package_override(package: str, safe_version: str, ecosystem: str = "np
     return f"apply_package_override is not yet supported for ecosystem: {ecosystem}"
 
 
-def bump_package_version(package: str, target_version: str, ecosystem: str = "npm") -> str:
+def bump_package_version(
+    package: str, target_version: str, ecosystem: str = "npm"
+) -> str:
     """Directly update a dependency's version and reinstall.
 
     Args:
@@ -204,6 +209,7 @@ def bump_package_version(package: str, target_version: str, ecosystem: str = "np
 
     elif ecosystem in ("python", "pip", "uv"):
         import re
+
         if not re.match(r"^[<>=^\~]", target_version):
             target_version = f"=={target_version}"
 
@@ -227,7 +233,9 @@ def check_remaining_vulnerabilities() -> str:
     try:
         audit = json.loads(out)
     except json.JSONDecodeError:
-        return json.dumps({"error": "Failed to parse npm audit output", "raw": out[:500]})
+        return json.dumps(
+            {"error": "Failed to parse npm audit output", "raw": out[:500]}
+        )
 
     meta = audit.get("metadata", {}).get("vulnerabilities", {})
     vulns = audit.get("vulnerabilities", {})
@@ -267,7 +275,13 @@ def commit_changes(message: str | None = None) -> str:
     _run(["git", "config", "user.name", "seccure-bot"])
     _run(["git", "config", "user.email", "seccure-bot@users.noreply.github.com"])
 
-    files_to_add = ["package.json", "package-lock.json", "pyproject.toml", "uv.lock", "requirements.txt"]
+    files_to_add = [
+        "package.json",
+        "package-lock.json",
+        "pyproject.toml",
+        "uv.lock",
+        "requirements.txt",
+    ]
     existing_files = [f for f in files_to_add if (_WORKSPACE / f).exists()]
     if existing_files:
         _run(["git", "add"] + existing_files)
@@ -301,30 +315,44 @@ def push_branch(branch_name: str, repo: str) -> str:
         return f"Push failed: {err}"
     return f"Pushed branch '{branch_name}' to {repo}."
 
+
 def get_commit_messages(base_branch: str, head_branch: str) -> list[str]:
     """
     Retrieves commit messages between the base_branch and head_branch locally.
-    
+
     Args:
         base_branch (str): The branch being merged into (e.g., 'main')
         head_branch (str): The feature branch with new commits
-        
+
     Returns:
         list[str]: A list of commit messages.
     """
-    code, out, err = _run(["git", "log", f"{base_branch}..{head_branch}", "--format=%B"])
+    code, out, err = _run(
+        ["git", "log", f"{base_branch}..{head_branch}", "--format=%B"]
+    )
     if code != 0:
         # Fallback if base_branch is not available locally, maybe try origin/base_branch
-        code, out, err = _run(["git", "log", f"origin/{base_branch}..{head_branch}", "--format=%B"])
+        code, out, err = _run(
+            ["git", "log", f"origin/{base_branch}..{head_branch}", "--format=%B"]
+        )
         if code != 0:
             return []
 
     # Split by empty line separating commits, or just split by some delimiter
     # Actually --format=%B just prints the raw body.
     # To get individual messages reliably, we can use a custom delimiter.
-    code, out, err = _run(["git", "log", f"{base_branch}..{head_branch}", "--format=%B%n---END_COMMIT---"])
+    code, out, err = _run(
+        ["git", "log", f"{base_branch}..{head_branch}", "--format=%B%n---END_COMMIT---"]
+    )
     if code != 0:
-        code, out, err = _run(["git", "log", f"origin/{base_branch}..{head_branch}", "--format=%B%n---END_COMMIT---"])
+        code, out, err = _run(
+            [
+                "git",
+                "log",
+                f"origin/{base_branch}..{head_branch}",
+                "--format=%B%n---END_COMMIT---",
+            ]
+        )
         if code != 0:
             return []
 

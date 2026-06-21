@@ -7,6 +7,7 @@ from src.lib.openrouter_runner import OpenRouterAgent, OpenRouterResponse
 
 logger = logging.getLogger(__name__)
 
+
 class ResilientOpenRouterAgent(OpenRouterAgent):
     """An OpenRouterAgent that automatically retries on rate limits and server errors."""
 
@@ -27,8 +28,10 @@ class ResilientOpenRouterAgent(OpenRouterAgent):
                     last_err = e
                     if attempt == self.max_retries:
                         break
-                    delay = self.base_delay * (2 ** attempt)
-                    logger.warning(f"OpenAI API error ({type(e).__name__}): {e}. Retrying in {delay}s...")
+                    delay = self.base_delay * (2**attempt)
+                    logger.warning(
+                        f"OpenAI API error ({type(e).__name__}): {e}. Retrying in {delay}s..."
+                    )
                     await asyncio.sleep(delay)
             if last_err:
                 raise last_err

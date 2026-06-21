@@ -11,6 +11,7 @@ class DummyContext:
     def __init__(self):
         self.state = {}
 
+
 @pytest.mark.asyncio
 async def test_run_audit_fanout_handles_permission_error():
     ctx = DummyContext()  # type: ignore
@@ -40,8 +41,9 @@ async def test_run_audit_fanout_handles_permission_error():
     assert result.fatal is True
     assert result.message == "Access denied"
 
+
 @pytest.mark.asyncio
-@patch('src.pipelines.subagents.audit_fanout.write_state_section')
+@patch("src.pipelines.subagents.audit_fanout.write_state_section")
 async def test_run_audit_fanout_success(mock_write_state):
     ctx = DummyContext()  # type: ignore
 
@@ -69,7 +71,6 @@ async def test_run_audit_fanout_success(mock_write_state):
     assert result.ok is True
     assert len(result.data["security_issues"]) == 1
     assert result.data["security_issues"][0]["issue_number"] == 1
-    assert len(result.data["dependency_findings"]) == 2 # 1 PR + 1 dep alert
+    assert len(result.data["dependency_findings"]) == 2  # 1 PR + 1 dep alert
     assert len(result.data["code_scanning_findings"]) == 1
     assert mock_write_state.call_count == 4
-

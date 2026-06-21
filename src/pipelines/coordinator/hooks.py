@@ -32,9 +32,7 @@ class MaxIterationsHook(hooks.PreToolCallDecideHook):
     async def run(self, context: HookContext, data: Any) -> HookResult:  # noqa: ANN401
         self._call_count += 1
         tool_name = getattr(data, "tool_name", "?")
-        print(
-            f"[Seccure] Tool call #{self._call_count}/{self._limit}: {tool_name}"
-        )
+        print(f"[Seccure] Tool call #{self._call_count}/{self._limit}: {tool_name}")
         if self._call_count > self._limit:
             msg = (
                 f"[Seccure] MaxIterationsHook: coordinator has exceeded its "
@@ -71,10 +69,7 @@ class FallbackHook(hooks.OnToolErrorHook):
                     f"[GitHub API 429 Rate Limited — too many requests, "
                     f"consider retrying later: {url}]"
                 )
-            return (
-                f"[GitHub API {code} error at {url}: "
-                f"{data.response.text[:300]}]"
-            )
+            return f"[GitHub API {code} error at {url}: {data.response.text[:300]}]"
         if isinstance(data, subprocess.CalledProcessError):
             return (
                 f"[Shell command failed (exit {data.returncode}): "

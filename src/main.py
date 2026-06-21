@@ -70,13 +70,16 @@ issue with the reason: "blocked by repo constraint: <quote the relevant rule>".
 
 def _trace_if_enabled(func):
     import os
+
     if os.environ.get("LANGCHAIN_TRACING_V2", "false").lower() == "true":
         try:
             from langsmith import traceable
+
             return traceable(run_type="chain", name="SeccureAgentRun")(func)
         except ImportError:
             pass
     return func
+
 
 @_trace_if_enabled
 async def main() -> None:
@@ -114,6 +117,7 @@ async def main() -> None:
     )
     init_state(state)
     from src.lib.state import _state_path
+
     print(f"[Seccure] State initialised at {_state_path(run_id)}")
 
     # 3. Build Coordinator with dynamically injected constraints
@@ -184,6 +188,7 @@ Begin now. Follow your system instructions exactly.
 
     # 6. Graceful shutdown
     from src.utils.mcp_client import get_mcp_manager
+
     await get_mcp_manager().stop_server()
 
 

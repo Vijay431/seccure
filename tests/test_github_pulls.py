@@ -1,4 +1,3 @@
-
 from src.utils.github_pulls import (
     extract_references_from_commits,
 )

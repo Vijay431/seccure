@@ -19,11 +19,13 @@ def _get_owner_repo() -> tuple[str, str]:
     try:
         res = subprocess.run(
             ["git", "remote", "get-url", "origin"],
-            capture_output=True, text=True, check=True
+            capture_output=True,
+            text=True,
+            check=True,
         )
         url = res.stdout.strip()
         # e.g., https://github.com/owner/repo.git or git@github.com:owner/repo.git
-        if "github.com" in url:
+        if url.startswith("https://github.com/") or url.startswith("git@github.com:"):
             path = url.split("github.com")[-1].lstrip(":/")
             path = path.removesuffix(".git")
             parts = path.split("/")
@@ -32,7 +34,9 @@ def _get_owner_repo() -> tuple[str, str]:
     except Exception:
         pass
 
-    raise ValueError("Could not determine repository owner and name from environment or git remote.")
+    raise ValueError(
+        "Could not determine repository owner and name from environment or git remote."
+    )
 
 
 async def list_security_issues(ctx: ToolContext) -> str:
@@ -52,13 +56,13 @@ async def list_security_issues(ctx: ToolContext) -> str:
     for label in ("security", "dependabot"):
         query = f"repo:{owner}/{repo} is:issue state:open label:{label}"
         try:
-            data = await manager.call_tool_with_retry("search_issues", {
-                "query": query,
-                "perPage": 30
-            })
+            data = await manager.call_tool_with_retry(
+                "search_issues", {"query": query, "perPage": 30}
+            )
         except Exception as e:
             # If tool fails, just continue
             import sys
+
             print(f"[Seccure] Warning: search_issues tool failed: {e}", file=sys.stderr)
             continue
 
@@ -70,6 +74,7 @@ async def list_security_issues(ctx: ToolContext) -> str:
         # If it returned an error string instead of JSON
         if items_text.startswith("failed to "):
             import sys
+
             print(f"[Seccure] search_issues error: {items_text}", file=sys.stderr)
             continue
 
@@ -80,6 +85,7 @@ async def list_security_issues(ctx: ToolContext) -> str:
 
         if len(items) == 30:
             import sys
+
             msg = f"[Seccure] Warning: Security issues for label '{label}' truncated to 30 items."
             print(msg, file=sys.stderr)
             ctx.set_state(f"issues_warning_{label}", msg)
@@ -93,15 +99,21 @@ async def list_security_issues(ctx: ToolContext) -> str:
             # search_issues might return limited fields, ensure we get title/labels/url
             # Sometimes labels might not be included in search results, so we do our best.
             labels = issue.get("labels", [])
-            if isinstance(labels, list) and len(labels) > 0 and isinstance(labels[0], dict):
+            if (
+                isinstance(labels, list)
+                and len(labels) > 0
+                and isinstance(labels[0], dict)
+            ):
                 labels = [lb.get("name") for lb in labels]
 
-            results.append({
-                "number": num,
-                "title": issue.get("title", ""),
-                "labels": labels,
-                "html_url": issue.get("url") or issue.get("html_url", "")
-            })
+            results.append(
+                {
+                    "number": num,
+                    "title": issue.get("title", ""),
+                    "labels": labels,
+                    "html_url": issue.get("url") or issue.get("html_url", ""),
+                }
+            )
 
     payload = json.dumps(results)
     ctx.set_state("raw_security_issues", payload)
@@ -141,27 +153,29 @@ Seccure Agent attempted all fix strategies and failed.
 
     title = f"🚨 Unresolved vulnerability: {package} ({cve_id})"
 
-    res = await manager.call_tool_with_retry("issue_write", {
-        "method": "create",
-        "owner": owner,
-        "repo": repo,
-        "title": title,
-        "body": body,
-        "labels": ["security", "conflict", "seccure"]
-    })
+    res = await manager.call_tool_with_retry(
+        "issue_write",
+        {
+            "method": "create",
+            "owner": owner,
+            "repo": repo,
+            "title": title,
+            "body": body,
+            "labels": ["security", "conflict", "seccure"],
+        },
+    )
 
     # Extract output URL and issue number
     if res and isinstance(res, list) and "text" in res[0]:
         output_text = res[0]["text"]
         try:
             issue_data = json.loads(output_text)
-            return json.dumps({
-                "issue_number": issue_data.get("number"),
-                "url": issue_data.get("html_url") or issue_data.get("url")
-            })
+            return json.dumps(
+                {
+                    "issue_number": issue_data.get("number"),
+                    "url": issue_data.get("html_url") or issue_data.get("url"),
+                }
+            )
         except json.JSONDecodeError:
-            return json.dumps({
-                "issue_number": 0,
-                "url": output_text
-            })
+            return json.dumps({"issue_number": 0, "url": output_text})
     return json.dumps({"issue_number": 0, "url": str(res)})

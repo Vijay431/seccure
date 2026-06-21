@@ -13,6 +13,7 @@ from src.config.config import RunLimits
 class OpenRouterResponse:
     def __init__(self, text_content: str):
         self._text = text_content
+
     async def text(self) -> str:
         return self._text
 
@@ -81,17 +82,20 @@ class OpenRouterAgent:
         args: dict[str, Any] = {}
         for name, param in sig.parameters.items():
             if OpenRouterAgent._is_tool_context_param(param):
+
                 class DummyContext:
                     def __init__(self):
                         self.state = {}
+
                     def get_state(self, key):
                         return self.state.get(key)
+
                     def set_state(self, key, val):
                         self.state[key] = val
+
                 args[name] = DummyContext()
             elif (
-                not OpenRouterAgent._is_injected_param(param)
-                and name in supplied_args
+                not OpenRouterAgent._is_injected_param(param) and name in supplied_args
             ):
                 args[name] = supplied_args[name]
         return args
@@ -134,19 +138,21 @@ class OpenRouterAgent:
                     required.append(name)
 
             desc = (tool.__doc__ or "").strip().split("\n")[0]
-            schemas.append({
-                "type": "function",
-                "function": {
-                    "name": tool.__name__,
-                    "description": desc or f"Tool {tool.__name__}",
-                    "parameters": {
-                        "type": "object",
-                        "properties": properties,
-                        "required": required,
-                        "additionalProperties": False,
-                    }
+            schemas.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.__name__,
+                        "description": desc or f"Tool {tool.__name__}",
+                        "parameters": {
+                            "type": "object",
+                            "properties": properties,
+                            "required": required,
+                            "additionalProperties": False,
+                        },
+                    },
                 }
-            })
+            )
         return schemas
 
     async def chat(self, prompt: str) -> OpenRouterResponse:
@@ -172,20 +178,18 @@ class OpenRouterAgent:
                 kwargs["tools"] = self._get_tool_schemas()
                 kwargs["tool_choice"] = "auto"
             if self.response_schema:
-                kwargs["response_format"] = {
-                    "type": "json_object"
-                }
+                kwargs["response_format"] = {"type": "json_object"}
 
             response = await self.client.chat.completions.create(**kwargs)
 
-            if hasattr(response, 'usage') and response.usage:
-                self.prompt_token_count += getattr(response.usage, 'prompt_tokens', 0)
+            if hasattr(response, "usage") and response.usage:
+                self.prompt_token_count += getattr(response.usage, "prompt_tokens", 0)
                 self.candidates_token_count += getattr(
                     response.usage,
-                    'completion_tokens',
+                    "completion_tokens",
                     0,
                 )
-                self.total_token_count += getattr(response.usage, 'total_tokens', 0)
+                self.total_token_count += getattr(response.usage, "total_tokens", 0)
 
             message = response.choices[0].message
 
@@ -200,9 +204,10 @@ class OpenRouterAgent:
                         "type": "function",
                         "function": {
                             "name": t.function.name,
-                            "arguments": t.function.arguments
-                        }
-                    } for t in message.tool_calls
+                            "arguments": t.function.arguments,
+                        },
+                    }
+                    for t in message.tool_calls
                 ]
 
             self.messages.append(msg_dict)
@@ -221,8 +226,7 @@ class OpenRouterAgent:
                         if "args" in content_json and not args:
                             args = content_json["args"]
                         print(
-                            f"[OpenRouter Fallback] Calling tool: "
-                            f"{func_name}({args})"
+                            f"[OpenRouter Fallback] Calling tool: {func_name}({args})"
                         )
                         _tool_call_count += 1
 
@@ -234,13 +238,15 @@ class OpenRouterAgent:
                         else:
                             result = func(**call_args)
 
-                        self.messages.append({
-                            "role": "user",
-                            "content": (
-                                f"Tool {func_name} returned:\n"
-                                f"{self._serialize_tool_result(result)}"
-                            )
-                        })
+                        self.messages.append(
+                            {
+                                "role": "user",
+                                "content": (
+                                    f"Tool {func_name} returned:\n"
+                                    f"{self._serialize_tool_result(result)}"
+                                ),
+                            }
+                        )
                         continue
                 except Exception:
                     pass
@@ -266,12 +272,14 @@ class OpenRouterAgent:
                     except Exception as e:
                         result = f"Error: {e}"
 
-                self.messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "name": func_name,
-                    "content": self._serialize_tool_result(result)
-                })
+                self.messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": func_name,
+                        "content": self._serialize_tool_result(result),
+                    }
+                )
 
     @property
     def conversation(self):
@@ -281,7 +289,9 @@ class OpenRouterAgent:
                 self.candidates_token_count = agent.candidates_token_count
                 self.thoughts_token_count = 0
                 self.total_token_count = agent.total_token_count
+
         class ConvDummy:
             def __init__(self, agent):
                 self.total_usage = UsageDummy(agent)
+
         return ConvDummy(self)

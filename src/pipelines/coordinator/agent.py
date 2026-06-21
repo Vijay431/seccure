@@ -71,6 +71,7 @@ def build_coordinator(system_prompt: str) -> OpenRouterAgent:
     if os.environ.get("LANGCHAIN_TRACING_V2", "false").lower() == "true":
         try:
             from langsmith import traceable
+
             tools_list = [traceable(t) if callable(t) else t for t in tools_list]
         except ImportError:
             print("[Seccure] Warning: langsmith not installed. Skipping tracing.")
@@ -78,6 +79,7 @@ def build_coordinator(system_prompt: str) -> OpenRouterAgent:
     async def invoke_subagent(TypeName: str, Role: str, Prompt: str) -> str:
         if TypeName == "PRAgent":
             from src.pipelines.subagents.pr_agent import build_pr_agent
+
             agent = build_pr_agent()
         else:
             return (

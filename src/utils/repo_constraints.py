@@ -15,16 +15,17 @@ async def read_repo_constraints() -> str:
         if constraints_file.exists():
             content = constraints_file.read_text().strip()
     else:
-        repo_env = os.environ.get("TARGET_REPO") or os.environ.get("GITHUB_REPOSITORY", "")
+        repo_env = os.environ.get("TARGET_REPO") or os.environ.get(
+            "GITHUB_REPOSITORY", ""
+        )
         if repo_env and "/" in repo_env:
             owner, repo = repo_env.split("/", 1)
             manager = get_mcp_manager()
             try:
-                res = await manager.call_tool_with_retry("get_file_contents", {
-                    "owner": owner,
-                    "repo": repo,
-                    "path": ".seccure/constraints.md"
-                })
+                res = await manager.call_tool_with_retry(
+                    "get_file_contents",
+                    {"owner": owner, "repo": repo, "path": ".seccure/constraints.md"},
+                )
                 # get_file_contents returns decoded content in the text field or we might need to parse json
                 # The MCP server usually returns file content directly in text.
                 if res and isinstance(res, list) and "text" in res[0]:
@@ -33,7 +34,11 @@ async def read_repo_constraints() -> str:
                         content = text_out.strip()
             except Exception as e:
                 import sys
-                print(f"[Seccure] Warning: failed to fetch constraints.md from API: {e}", file=sys.stderr)
+
+                print(
+                    f"[Seccure] Warning: failed to fetch constraints.md from API: {e}",
+                    file=sys.stderr,
+                )
 
     if content:
         parts.append(f"## From .seccure/constraints.md\n\n{content}")

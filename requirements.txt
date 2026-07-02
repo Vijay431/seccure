@@ -1,6 +1,6 @@
 google-antigravity
 pydantic>=2.7.0
-langsmith>=0.1.0
+langsmith>=0.9.5
 openai>=1.0.0
 tenacity>=8.0.0
 langchain
